@@ -1,0 +1,6 @@
+# CPU-only local visual-analysis runtime for x86_64 Linux / Python 3.12.
+# Install before the editable package. This avoids pulling CUDA runtime packages
+# on the project's CPU-only VM. Update the pair together after fixture evaluation.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
