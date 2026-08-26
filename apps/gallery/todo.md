@@ -23,5 +23,5 @@
 - [x] Remove the broken template login dependency from Drive connection and launch Google OAuth directly.
 - [x] Support multiple simultaneous linked Google Drive sources without source replacement.
 - [x] Index and render linked Drive images, videos, and ordinary files as read-only previews.
-- [ ] Integrate Ollama sorting and AI features after the user supplies the intended endpoint and access requirements.
+- [ ] Integrate the Gallery with the approved private Ollama and Search service boundaries only after Gate 5 exposes a stable executable Search API and the architect assigns the Gallery integration gate.
 - [x] Synchronize the selected Pixeldrive GitHub repository with the completed mobile source and reviewer-ready documentation.
