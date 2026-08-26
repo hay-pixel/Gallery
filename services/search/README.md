@@ -82,20 +82,22 @@ Visual results use the project Search result shape: `asset_id`, `content_hash`, 
 | `ready` | The profile has one or more active vectors and no stale vectors. |
 | `degraded` | One or more stale or corrupt vectors require reindexing. Remaining active vectors are still retained, while stale vectors remain excluded from retrieval. |
 
-## Feature adapter contract
+## Gate 4: executable Analysis VisualFeature bridge
 
-Search does not import the Analysis package. An adapter owned at the accepted integration boundary must convert an Analysis visual feature into `VisualFeatureInput` using this mapping:
+Analysis does not call Search internals and production Search does not import `analysis_service`. The executable boundary is serialized project-owned data:
 
-| Search input | Required source value |
-|---|---|
-| `asset_id` | Canonical `AnalysisRecord.asset_id` |
-| `content_hash` | `AnalysisRecord.input_content_hash` |
-| `feature_family` | Explicit, portable family chosen by the analysis/search contract, for example `visual-embedding` |
-| `model_id`, `model_version`, `dimension` | Normalised visual-feature provenance |
-| `values` | Vector values, or values resolved from an authorised portable storage reference |
-| `analysis_version`, `analysis_revision` | Analysis schema version and analysis record/revision identity |
+```text
+Analysis VisualFeature.to_dict()
+  -> search_service.analysis_adapter.visual_feature_input_from_analysis()
+  -> validated VisualFeatureInput
+  -> persistent visual index
+```
 
-The adapter must reject a feature if its source content hash does not equal the canonical content hash, if its dimension is inconsistent, or if it is not produced by the requested compatible profile. A storage reference must be resolved at the authorised Analysis/Search boundary; Search persists the resulting validated vector as derived data.
+The adapter maps Analysis `schema`, `schema_version`, `feature_id`, canonical asset/hash, full feature compatibility key, inline values, generated timestamp, logical `analysis_id`, and exact upstream `result_id` to Search `analysis_result_id` unchanged. It requires non-empty Analysis profile ID/version and `scope: whole_image` for image-v1.
+
+Use `ollamabinsaden-search --database ./data/search/visual-index.sqlite3 index-analysis-feature --feature-json ./feature.json`, or pass `-` for stdin. The output reports canonical asset/feature/Analysis IDs, index identity/version, and whether durable state changed without exposing raw vectors or SQLite row identities.
+
+Gate 4 accepts only inline vector payloads. An external `storage_reference` without `values` is rejected with a typed contract error because external blob decoding and lifecycle ownership remain future Search work. This bridge is not full Search: metadata, semantic, hybrid, pagination, HTTP/API, Ollama, and Gallery integration remain out of scope.
 
 ## Persistence, backup and recovery
 
@@ -121,7 +123,7 @@ pytest services/search/tests
 ollamabinsaden-search --database "$SORTER_STATE_ROOT/search/visual-index.sqlite3" health
 ```
 
-The CLI is intentionally limited to local state inspection. It is not a public service endpoint. A future VM deployment unit should bind any service adapter to the private network and supply the database path through environment/configuration without placing secrets in the repository.
+The CLI is intentionally limited to local state inspection and typed serialized Analysis feature indexing. It is not a public service endpoint. A future VM deployment unit should bind any service adapter to the private network and supply the database path through environment/configuration without placing secrets in the repository.
 
 ## Evaluation and performance
 
