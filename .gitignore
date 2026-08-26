@@ -3,8 +3,11 @@
 .env.*
 !.env.example
 !*.env.example
+!.env.*.example
 
 # Python generated output
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *.egg-info/
