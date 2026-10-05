@@ -10,7 +10,9 @@ type OAuthState = { ownerId: string; returnUri: string; nonce: string; expiresAt
 type TokenResponse = { access_token?: string; refresh_token?: string; scope?: string; expires_in?: number; error?: string; error_description?: string };
 
 function required(name: "GOOGLE_DRIVE_OAUTH_CLIENT_ID" | "GOOGLE_DRIVE_OAUTH_CLIENT_SECRET") {
-  const value = process.env[name];
+  const value = name === "GOOGLE_DRIVE_OAUTH_CLIENT_ID"
+    ? process.env.GOOGLE_DRIVE_OAUTH_CLIENT_ID
+    : process.env.GOOGLE_DRIVE_OAUTH_CLIENT_SECRET;
   if (!value) throw new Error(`${name} is not configured`);
   return value;
 }

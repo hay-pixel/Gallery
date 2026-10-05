@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ollamabinsaden.local/schema/source-occurrence-record-v1.json",
+  "title": "Source occurrence record v1",
+  "type": "object",
+  "required": ["schema", "schema_version", "source_occurrence_id", "asset_id", "source_id", "source_kind", "source_location", "original_path", "ingest_job_id", "observed_at"],
+  "properties": {
+    "schema": {"const": "source-occurrence-record"}, "schema_version": {"const": 1},
+    "source_occurrence_id": {"pattern": "^occurrence:sha256:[0-9a-f]{64}$"},
+    "asset_id": {"pattern": "^sha256:[0-9a-f]{64}$"}, "source_id": {"type": "string"},
+    "source_kind": {"type": "string"}, "source_location": {"type": "string"},
+    "original_path": {"type": "string"}, "ingest_job_id": {"type": "string"},
+    "observed_at": {"type": "string"}, "source_archive_id": {"type": ["string", "null"]},
+    "source_archive_location": {"type": ["string", "null"]}, "source_member": {"type": ["string", "null"]}
+  }
+}

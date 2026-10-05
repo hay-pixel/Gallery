@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "owner_repository": "https://github.com/hay-pixel/Extractor",
+  "source_repository": "https://github.com/hay-pixel/Ollamabinsaden",
+  "source_commit": "dcef931fbe318df84a8ddf8cfc0c1e2cb06b5305",
+  "source_path": "packages/asset-schema/schema",
+  "asset_package_version": "1.0.0",
+  "release_status": "migration snapshot; tagged Extract release pending",
+  "files": [
+    "asset-record-v1.schema.json",
+    "source-occurrence-record-v1.schema.json"
+  ]
+}

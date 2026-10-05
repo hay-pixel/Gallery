@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ollamabinsaden.local/schema/asset-record-v1.json",
+  "title": "Canonical asset record v1",
+  "type": "object",
+  "required": ["schema", "schema_version", "asset_id", "storage_locator", "mime_type", "size_bytes", "content_hash", "processing_state"],
+  "properties": {
+    "schema": {"const": "asset-record"}, "schema_version": {"const": 1},
+    "asset_id": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "content_hash": {"pattern": "^sha256:[0-9a-f]{64}$"},
+    "storage_locator": {"type": "string"},
+    "mime_type": {"type": "string"}, "size_bytes": {"type": "integer", "minimum": 0},
+    "processing_state": {"enum": ["ready", "failed"]}
+  }
+}
