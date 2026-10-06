@@ -26,6 +26,8 @@ Gallery owns its catalogue, annotations, Analysis, Search, and Ollama orchestrat
 
 ## Node setup
 
+For Codex desktop setup scripts and worktree actions, see [Codex environment setup](docs/CODEX-ENVIRONMENT.md).
+
 Node 22+, pnpm 9.12.0:
 
 ```bash
