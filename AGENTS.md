@@ -2,6 +2,8 @@
 
 Read README.md, docs/MIGRATION.md, relevant subsystem contracts, and deploy/aws/README.md before implementation. README.md describes current implementation and remaining milestones; do not claim planned features exist.
 
+The user reports an existing AWS Ubuntu backend host; its endpoints and compatibility are not verified here. Inspect that host before choosing adapters or deployment changes. The catalogue CLI exists, but authenticated catalogue/media HTTP routes and real-library UI integration remain unfinished. Follow the root README continuation sequence.
+
 Own independent source connectors, catalogue, Analysis, Search, and private Ollama. Extract export is one optional source. Preserve canonical identity, source occurrences, user overrides, and degraded behavior.
 
 This standalone repository supersedes the historical monorepo planning pause for its assigned product. Old handoffs are evidence, not active assignments. Preserve tested behavior. Keep all credentials/runtime state outside Git. Use independent CI and record test evidence and remaining limitations.

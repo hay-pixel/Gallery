@@ -35,7 +35,7 @@ case "${1:-setup}" in
   setup)
     require_node
     prepare_python
-    uv pip install --python .venv/bin/python -e 'services/analysis[test]' -e 'services/search[test]'
+    uv pip install --python .venv/bin/python -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/catalogue[test]'
     cd apps/gallery
     if [[ "$(pnpm_run --version)" != "9.12.0" ]]; then
       printf 'Gallery requires pnpm 9.12.0.\n' >&2
@@ -46,7 +46,7 @@ case "${1:-setup}" in
     printf 'Gallery dependencies and server build are ready. Real models/OAuth are configured separately.\n'
     ;;
   test)
-    .venv/bin/python -m pytest services/analysis/tests services/search/tests tests/integration
+    .venv/bin/python -m pytest services/analysis/tests services/search/tests services/catalogue/tests tests/integration
     cd apps/gallery
     pnpm_run check
     pnpm_run exec eslint .

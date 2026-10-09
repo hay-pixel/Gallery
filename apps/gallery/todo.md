@@ -23,5 +23,16 @@
 - [x] Remove the broken template login dependency from Drive connection and launch Google OAuth directly.
 - [x] Support multiple simultaneous linked Google Drive sources without source replacement.
 - [x] Index and render linked Drive images, videos, and ordinary files as read-only previews.
-- [ ] Integrate the Gallery with the approved private Ollama and Search service boundaries only after Gate 5 exposes a stable executable Search API and the architect assigns the Gallery integration gate.
+- [ ] Integrate the Gallery with the accepted private Ollama and Search contracts after implementing/verifying executable APIs. Historical monorepo Gate 5/architect assignment requirements are superseded by the standalone root README and AGENTS.md.
 - [x] Synchronize the selected Pixeldrive GitHub repository with the completed mobile source and reviewer-ready documentation.
+
+## Standalone backend integration (current work)
+
+- [x] Add Gallery-owned local collection ingestion, SHA-256 canonical identity, source occurrences, and persistent owner-scoped CLI listing.
+- [x] Add catalogue schema/provenance/restart/failure tests and fixture Analysis/Search interoperability; wire setup and CI.
+- [ ] Inspect the user-reported AWS Ubuntu backend and map its actual routes/authentication to the accepted contracts.
+- [ ] Implement authenticated catalogue pagination and authorized media delivery.
+- [ ] Wire a real-library client adapter; preserve canonical-ID review overrides and explicit unavailable states.
+- [ ] Validate real Drive ingestion, deployed OAuth returns, durable restart, and native/device behavior.
+
+The current app evaluation catalogue is not proof of live backend integration. See the root README for current priorities.

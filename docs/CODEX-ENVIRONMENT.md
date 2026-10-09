@@ -4,7 +4,7 @@ These instructions configure the screen under Codex Settings → Worktrees → L
 
 ## Prerequisites
 
-Bash, uv, Node 22+, and Corepack or pnpm 9.12.0. Python tests use fixture backends; setup does not download Torch models, install Ollama, or create MySQL.
+Bash, uv, Node 22+, and Corepack or pnpm 9.12.0. Python tests include real local catalogue import and fixture Analysis/Search backends; setup does not download Torch models, install Ollama, or create MySQL.
 
 The scripts support Linux/macOS Unix environments. They are not native PowerShell scripts. On Windows, use a WSL2 project/terminal; do not paste Bash into the Windows PowerShell override. Windows-native Extract/Gallery setup can instead use the individual commands in the root README, but that path has not been verified here.
 

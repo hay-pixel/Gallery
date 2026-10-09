@@ -21,3 +21,15 @@ Set `DATABASE_URL`, `GALLERY_WEB_RETURN_ORIGINS` (comma-separated exact Gallery 
 Analysis and Search are optional capabilities with explicit availability states. Deterministic catalogue browsing/search works while Analysis, Search similarity, or Ollama is unavailable. Current sample data is an adapter/evaluation catalogue; wiring the filesystem ingest record reader and permanent Search/Analysis HTTP contracts remains integration work.
 
 Production uses `dist/index.mjs` and binds exactly `PORT`. Anonymous signed Gallery sessions provide device-local Drive ownership; cross-device account recovery is not implemented yet.
+
+## Backend integration status
+
+The repository now includes `services/catalogue` for local collection ingestion and durable
+owner-scoped listing. It is an operator CLI, not an HTTP endpoint, and this app still uses
+its evaluation catalogue. Follow the root README's next-work sequence to add an authenticated
+catalogue/media boundary and client adapter before treating live library integration as done.
+
+The user reports an AWS Ubuntu backend host, but no host routes have been inspected here.
+The existing tRPC client requires compatible routes, SuperJSON, and signed bearer sessions;
+setting `EXPO_PUBLIC_API_BASE_URL` only selects the origin. Use `deploy/aws/README.md` for the
+host integration checklist and `.env.example` for the existing configuration names.

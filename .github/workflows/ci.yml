@@ -30,5 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e 'services/analysis[test]' -e 'services/search[test]'
-      - run: pytest services/analysis/tests services/search/tests tests/integration
+      - run: python -m pip install -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/catalogue[test]'
+      - run: pytest services/analysis/tests services/search/tests services/catalogue/tests tests/integration
+      - run: ruff check services/catalogue
+      - run: mypy --strict services/catalogue/src

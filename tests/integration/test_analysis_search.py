@@ -59,3 +59,33 @@ def test_real_analysis_serialized_feature_indexes_and_retrieves_exact_result_pro
         rerun_input = visual_feature_input_from_analysis(rerun.visual_features[0].to_dict())
         search.index_visual_feature(rerun_input)
         assert search.find_visually_similar(asset_a.asset_id, search_a.profile)[0].analysis_result_id == rerun.result_id
+
+
+def test_local_catalogue_bytes_feed_existing_analysis_search_contracts(tmp_path):
+    from catalogue_service.store import Catalogue
+
+    source = tmp_path / "collection"
+    source.mkdir()
+    Image.new("RGB", (2, 2), "red").save(source / "a.png")
+    Image.new("RGB", (2, 2), "blue").save(source / "b.png")
+    catalogue = Catalogue(tmp_path / "catalogue")
+    try:
+        catalogue.import_collection(source, owner="alice", source_id="local-photos")
+        rows = catalogue.list_assets(owner="alice")["results"]
+    finally:
+        catalogue.close()
+    # Analysis must read owned canonical bytes, even if originals disappear.
+    for path in source.iterdir():
+        path.unlink()
+    analysis = AnalysisService(backend=DeterministicBackend(), output_root=tmp_path / "analysis")
+    inputs = []
+    for row in rows:
+        asset = AssetInput.from_asset_record(row["asset"])
+        record = analysis.analyse(asset).record
+        assert record.input_content_hash == asset.asset_id
+        inputs.append(visual_feature_input_from_analysis(record.visual_features[0].to_dict()))
+    with VisualSearchService(tmp_path / "search.sqlite3") as search:
+        for feature in inputs:
+            search.index_visual_feature(feature)
+        matches = search.find_visually_similar(inputs[0].asset_id, inputs[0].profile)
+        assert [result.asset_id for result in matches] == [inputs[1].asset_id]
