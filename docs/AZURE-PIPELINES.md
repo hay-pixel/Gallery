@@ -6,4 +6,6 @@ Use the run Summary to download published pipeline artifacts and the Tests tab f
 
 CI checks Analysis/Search/integration tests, app types/lint/tests, the Node server bundle, and the Expo static web export. The web client directly declares the pinned CSS interop runtime required by NativeWind-generated JSX imports under pnpm.
 
+Metro seeds the CSS interop web cache before its initial file crawl. This prevents a missing SHA-1 on fresh hosted agents. To check the cold path locally, remove the generated `react-native-css-interop/.cache/web.css` file in node_modules and run `CI=1 corepack pnpm exec expo export --clear --platform web --output-dir web-dist` from `apps/gallery`.
+
 Outputs are `gallery-server` and `gallery-web`. Real Drive consent, a configured database, real model execution, and unfinished catalogue/Ollama features need separate product acceptance.
