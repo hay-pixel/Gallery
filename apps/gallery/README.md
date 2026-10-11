@@ -6,6 +6,9 @@ Canonical catalogue records are keyed by ingest `asset_id` (`sha256:<digest>`) a
 
 ## Commands
 
+For native Android builds and the folder to open in Android Studio, see
+[Android Studio setup](../../docs/ANDROID-STUDIO.md).
+
 ```bash
 corepack pnpm install --frozen-lockfile
 corepack pnpm check
