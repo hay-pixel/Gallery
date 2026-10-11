@@ -49,3 +49,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Azure Pipelines generated artifacts
+web-dist/

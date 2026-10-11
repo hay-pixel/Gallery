@@ -1,0 +1,71 @@
+name: Gallery-$(Date:yyyyMMdd)$(Rev:.r)
+trigger:
+  batch: true
+  branches:
+    include:
+      - main
+pr:
+  autoCancel: true
+  branches:
+    include:
+      - main
+pool:
+  vmImage: ubuntu-24.04
+jobs:
+- job: BuildAndTest
+  displayName: Gallery build and test
+  timeoutInMinutes: 45
+  steps:
+  - checkout: self
+    clean: true
+    persistCredentials: false
+  - task: UseNode@1
+    inputs:
+      version: '22.x'
+    displayName: Use Node 22
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.12'
+    displayName: Use Python 3.12
+  - bash: |
+      set -euo pipefail
+      python -m pip install uv
+      corepack enable
+      corepack prepare pnpm@9.12.0 --activate
+      bash scripts/codex/environment.sh setup
+    displayName: Install dependencies and prepare Gallery
+  - bash: |
+      set -euo pipefail
+      mkdir -p test-results
+      .venv/bin/python -m pytest services/analysis/tests services/search/tests tests/integration --junitxml=test-results/python.xml
+    displayName: Test Analysis, Search, and integration
+  - bash: |
+      set -euo pipefail
+      corepack pnpm check
+      corepack pnpm exec eslint .
+      corepack pnpm run test --reporter=default --reporter=junit --outputFile=../../test-results/gallery.xml
+    workingDirectory: apps/gallery
+    displayName: Typecheck, lint, and test Gallery app
+    condition: succeededOrFailed()
+  - bash: bash scripts/codex/environment.sh build
+    displayName: Build Gallery server
+  - bash: CI=1 corepack pnpm exec expo export --platform web --output-dir web-dist
+    workingDirectory: apps/gallery
+    displayName: Build Gallery web client
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'test-results/*.xml'
+      testRunTitle: Gallery automated tests
+      failTaskOnFailedTests: true
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: apps/gallery/dist
+      artifact: gallery-server
+    displayName: Publish Gallery server build
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: apps/gallery/web-dist
+      artifact: gallery-web
+    displayName: Publish Gallery web client
