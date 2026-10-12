@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hostedModels } from "./hostedModels";
 import { publicProcedure, router, sessionProcedure } from "./_core/trpc";
 import { getGoogleDriveSource, listGoogleDriveSourceRecords, listGoogleDriveSources } from "./db";
 import { createDriveAuthorizationUrl, listDriveFiles } from "./googleDrive";
@@ -12,6 +13,7 @@ function galleryDriveFile(ownerId: string, sourceId: number, file: Awaited<Retur
 }
 
 export const appRouter = router({
+  hosted: router({ models: sessionProcedure.query(() => hostedModels()) }),
   health: publicProcedure.query(() => ({ ok: true as const })),
   session: router({ create: publicProcedure.mutation(() => createGallerySession()) }),
   googleDrive: router({

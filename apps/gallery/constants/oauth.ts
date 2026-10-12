@@ -1,5 +1,6 @@
 import * as Linking from "expo-linking";
 import * as ReactNative from "react-native";
+import { getRuntimeBackend } from "@/lib/client-runtime";
 
 const schemeFromBundleId = "ollamabinsaden-gallery";
 
@@ -26,6 +27,8 @@ export const API_BASE_URL = env.apiBaseUrl;
  * URL pattern: https://PORT-sandboxid.region.domain
  */
 export function getApiBaseUrl(): string {
+  const runtime = getRuntimeBackend();
+  if (runtime !== undefined) return runtime;
   // If API_BASE_URL is set, use it
   if (API_BASE_URL) {
     return API_BASE_URL.replace(/\/$/, "");

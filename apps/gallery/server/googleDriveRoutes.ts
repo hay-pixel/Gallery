@@ -7,7 +7,7 @@ import { verifyDriveAccessGrant } from "./session";
 export function getApiOrigin(req: Request) { const protocol = (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0] || req.protocol || "https"; return `${protocol}://${req.get("host")}`; }
 export function getDriveCallbackUri(req: Request) { return `${getApiOrigin(req)}/api/google-drive/callback`; }
 export function allowedDriveReturnUris() {
-  const configured = (process.env.GALLERY_WEB_RETURN_ORIGINS ?? "").split(",").map((value) => value.trim()).filter(Boolean).map((origin) => `${origin.replace(/\/$/, "")}/oauth/drive`);
+  const configured = (process.env.GALLERY_WEB_RETURN_ORIGINS ?? "").split(",").map((value: string) => value.trim()).filter(Boolean).map((origin: string) => `${origin.replace(/\/$/, "")}/oauth/drive`);
   if (process.env.NODE_ENV !== "production") configured.push("http://localhost:8081/oauth/drive", "http://127.0.0.1:8081/oauth/drive");
   return configured;
 }

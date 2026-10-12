@@ -4,6 +4,7 @@ import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
 import { getGallerySessionToken } from "@/lib/gallery-session";
 import { getApiBaseUrl } from "@/constants/oauth";
+import { fetchWithTimeout } from "./client-runtime";
 
 /**
  * tRPC React client for type-safe API calls.
@@ -25,10 +26,13 @@ export function createTRPCClient() {
         url: `${getApiBaseUrl()}/api/trpc`,
         // tRPC v11: transformer MUST be inside httpBatchLink, not at root
         transformer: superjson,
-        async headers() { const token = await getGallerySessionToken(); return token ? { Authorization: `Bearer ${token}` } : {}; },
+        async headers() {
+          const token = await getGallerySessionToken();
+          return token ? { Authorization: `Bearer ${token}` } : {};
+        },
         // Custom fetch to include credentials for cookie-based auth
         fetch(url, options) {
-          return fetch(url, {
+          return fetchWithTimeout(url, {
             ...options,
             credentials: "include",
           });

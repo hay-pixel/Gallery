@@ -1,0 +1,2 @@
+# Preserve the context-line spaces required by archived Git patches.
+docs/source-comparison/*.patch -whitespace

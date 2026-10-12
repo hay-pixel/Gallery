@@ -13,8 +13,9 @@ describe("runtime independence and source boundaries", () => {
 
   it("keeps Drive provider IDs explicitly source-scoped rather than canonical", () => {
     const screen = readFileSync(join(process.cwd(), "app/(tabs)/index.tsx"), "utf8");
-    expect(screen).toContain("type DriveFile = { id: string");
-    expect(screen).toContain("type FileRecord");
+    expect(screen).toMatch(/type DriveFile\s*=\s*\{\s*id:\s*string/);
+    expect(screen).toContain("type LibraryEntry");
+    expect(screen).toMatch(/sourceId:\s*`drive:\$\{file.sourceId\}`/);
     expect(screen).not.toMatch(/assetId:\s*file\.id/);
   });
 });
