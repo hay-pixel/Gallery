@@ -4,6 +4,9 @@ Standalone universal file library: authorized sources, unified catalogue, browse
 
 ## Current status
 
+Gallery 1.1.0 indexes selected phone folders locally, preserves manual tags, supports metadata search/sorting, and uses an operator-configured service origin. Users do not enter a server or Ollama URL. The Drive handoff records a remote native build and emulator checks; this VM independently verified the downloaded APK and reran the app and Python suites. Physical-phone and hosted-service acceptance remain pending. See [the client release handoff](docs/CLIENT-RELEASE-HANDOFF.md) and [the prepared IDE handoff](docs/IDE-HANDOFF.md).
+
+
 The Expo/React Native + Node app, read-only Google Drive OAuth, image-v1 Analysis, visual Search, and Analysis→Search bridge are migrated. Full metadata/semantic/hybrid Search, real catalogue integration, and the Ollama adapter remain unfinished. `services/ollama` currently holds documentation, not a completed runtime.
 
 ## Layout
@@ -93,3 +96,7 @@ Independent repositories/releases can initially share a host, with separate iden
 Source `hay-pixel/Ollamabinsaden` at `dcef931fbe318df84a8ddf8cfc0c1e2cb06b5305`; filtered history retained. Existing Gallery README-only lineage is preserved. Other source lineages include `hay-pixel/Pixeldrive` and `hay-pixel/Privatedrive`; inspect unique later work before migrating it. Old handoffs are evidence, not current assignments.
 
 See [migration results](docs/MIGRATION.md). [Extract](https://github.com/hay-pixel/Extractor) · [Assist](https://github.com/hay-pixel/Assist) · [Gallery](https://github.com/hay-pixel/Gallery).
+
+## Gallery 1.1 client update (12 October 2026)
+
+The Android client now indexes selected phone folders locally, supports persistent manual tags and metadata sorting/search, and uses a simplified light/dark interface. Phone file contents remain on-device. Hosting is configured by operators, with model choice from the curated server catalogue. See `docs/CLIENT-RELEASE-HANDOFF.md` for implemented behaviour, tests and native build/live-service limitations. Canonical ingestion, AI tagging and hosted inference remain separate backend milestones.

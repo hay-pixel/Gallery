@@ -6,6 +6,8 @@ Own independent source connectors, catalogue, Analysis, Search, and private Olla
 
 This standalone repository supersedes the historical monorepo planning pause for its assigned product. Old handoffs are evidence, not active assignments. Preserve tested behavior. Keep all credentials/runtime state outside Git. Use independent CI and record test evidence and remaining limitations.
 
+User help_level: LOW — proceed within the authorised task and report concrete blockers.
+
 AWS project profile: `ollamabinsaden`. Selected Region: `ap-southeast-2`. Agent Toolkit's service endpoint uses `us-east-1`; project resources use the selected Region. AWS replaces historical Azure deployment assumptions.
 
 <!-- BEGIN AWS Agent Toolkit rules -->

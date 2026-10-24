@@ -1,0 +1,258 @@
+[
+  {
+    "remote": "gdrive",
+    "files": [
+      {
+        "md5Checksum": "a4a55ee636535553d42a50405862de98",
+        "mimeType": "application/zip",
+        "parents": [
+          "1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1H3wENw-hgCpMemgGmnCwKtZu5cbSKMrs/view?usp=drivesdk",
+        "size": "8748",
+        "id": "1H3wENw-hgCpMemgGmnCwKtZu5cbSKMrs",
+        "name": "Gallery-deployment.zip",
+        "modifiedTime": "2026-10-12T09:22:47.592Z"
+      },
+      {
+        "md5Checksum": "8848697216ff9eeb91d8a4e6617ef065",
+        "mimeType": "text/markdown",
+        "parents": [
+          "1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/19QrrnKM3xrN75wKV64e2Z9qDeMpDlTKs/view?usp=drivesdk",
+        "size": "6644",
+        "id": "19QrrnKM3xrN75wKV64e2Z9qDeMpDlTKs",
+        "name": "Gallery-Gemini-Handoff.md",
+        "modifiedTime": "2026-10-12T09:22:35.579Z"
+      },
+      {
+        "md5Checksum": "8effd264189126dc2e310c434d044112",
+        "mimeType": "application/zip",
+        "parents": [
+          "1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1P8amfJdfVoHr3zuYWpoSCs3WqJh6PtX1/view?usp=drivesdk",
+        "size": "1427223",
+        "id": "1P8amfJdfVoHr3zuYWpoSCs3WqJh6PtX1",
+        "name": "Gallery-main.zip",
+        "modifiedTime": "2026-10-12T09:22:24.832Z"
+      },
+      {
+        "md5Checksum": "468ec4fde8205538ce3fd4cff8bf3ad7",
+        "mimeType": "application/vnd.android.package-archive",
+        "parents": [
+          "1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1See6oJflmXe8_uwPUcw9Uu9IcvgLsqfX/view?usp=drivesdk",
+        "size": "93138866",
+        "id": "1See6oJflmXe8_uwPUcw9Uu9IcvgLsqfX",
+        "name": "gallery-phone-test.apk",
+        "modifiedTime": "2026-10-12T09:22:13.870Z"
+      },
+      {
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [
+          "10-8lPALbKrxQzLt7AxG-Ycg6Jgfyy7Kp"
+        ],
+        "webViewLink": "https://drive.google.com/drive/folders/1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb",
+        "id": "1RIQuhvKkWvNE0amUP5z5JucP2lHW1dtb",
+        "name": "Gallery",
+        "modifiedTime": "2026-10-11T23:04:55.398Z"
+      },
+      {
+        "md5Checksum": "4cfbbdfdb9141da31a01dca817e46b5a",
+        "mimeType": "application/vnd.android.package-archive",
+        "parents": [
+          "1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/19d7r_mqktNFGqDIBJNV1OT-1EAdE-vqr/view?usp=drivesdk",
+        "size": "51931921",
+        "id": "19d7r_mqktNFGqDIBJNV1OT-1EAdE-vqr",
+        "name": "ollamabinsaden-gallery-local-pairing-1.0.4.apk",
+        "modifiedTime": "2026-09-14T03:22:43.158Z"
+      },
+      {
+        "md5Checksum": "ec8a0ed86b2a811d6f5e88853c15afbf",
+        "mimeType": "text/markdown",
+        "parents": [
+          "1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/117Y2mAoChe5qBYbokYX5h9oQhpp-Izeq/view?usp=drivesdk",
+        "size": "2056",
+        "id": "117Y2mAoChe5qBYbokYX5h9oQhpp-Izeq",
+        "name": "GALLERY_APK_DOWNLOAD.md",
+        "modifiedTime": "2026-09-13T14:32:01.372Z"
+      },
+      {
+        "md5Checksum": "8eca0cd6b272a4e520aff3e5864663d8",
+        "mimeType": "application/vnd.android.package-archive",
+        "parents": [
+          "1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1m1hm6TzONkuiAG8EXqJ-BW4lp0Fig9LK/view?usp=drivesdk",
+        "size": "38358709",
+        "id": "1m1hm6TzONkuiAG8EXqJ-BW4lp0Fig9LK",
+        "name": "ollamabinsaden-gallery-source-previews-1.0.2.apk",
+        "modifiedTime": "2026-09-13T13:42:46.511Z"
+      },
+      {
+        "md5Checksum": "4eceff039b040268c804577181ad7453",
+        "mimeType": "application/vnd.android.package-archive",
+        "parents": [
+          "1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1rLWqqNV-uuJZguLzSgphrNJbkH1F8t60/view?usp=drivesdk",
+        "size": "38358709",
+        "id": "1rLWqqNV-uuJZguLzSgphrNJbkH1F8t60",
+        "name": "ollamabinsaden-gallery-source-previews-1.0.1.apk",
+        "modifiedTime": "2026-09-13T13:31:38.594Z"
+      },
+      {
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [
+          "1zHGuTSz5bznqch2IXtVvnuxHsIlFlrt4"
+        ],
+        "webViewLink": "https://drive.google.com/drive/folders/1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z",
+        "id": "1zVz9q-5H7RIFYVPh7sChbnrMvAGGo51Z",
+        "name": "Gallery",
+        "modifiedTime": "2026-09-13T08:44:50.216Z"
+      },
+      {
+        "md5Checksum": "4d19852a6443c92ee514ae1f7b96aa40",
+        "mimeType": "text/texmacs",
+        "parents": [
+          "19E5FQPmLMB524uiyIxvfmDSf10lMLUMn"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1DjnouMmFmk8ia9uDP7cdPgc_qb9k_gx3/view?usp=drivesdk",
+        "size": "20429",
+        "id": "1DjnouMmFmk8ia9uDP7cdPgc_qb9k_gx3",
+        "name": "pixeldrive.ts",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "md5Checksum": "4d6cde1915d74b4fe9fa55eae5dda509",
+        "mimeType": "text/markdown",
+        "parents": [
+          "12yfovz0kfvhVStJIOnie20PfS5TqQQUD"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1oAw34O2-GxBvQYsR5cLjqCSQNQngxfgH/view?usp=drivesdk",
+        "size": "10393",
+        "id": "1oAw34O2-GxBvQYsR5cLjqCSQNQngxfgH",
+        "name": "CODEX-1-GALLERY.md",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [
+          "1wPKi2ZkdjJbIoqZ4gdL2sryDzEePiSO3"
+        ],
+        "webViewLink": "https://drive.google.com/drive/folders/1Qmzi-2aoXkxuXtFEj7yE_ECE540ZvL20",
+        "id": "1Qmzi-2aoXkxuXtFEj7yE_ECE540ZvL20",
+        "name": "gallery",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "md5Checksum": "b4de4274595da8ad26c63b747c2b30f5",
+        "mimeType": "text/markdown",
+        "parents": [
+          "106slmBsPmiiqE2rYsPIq7-zXwQo1Tp4s"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1r3_aQPN3efJRVmqeulZkfSNokNoJJH_i/view?usp=drivesdk",
+        "size": "8050",
+        "id": "1r3_aQPN3efJRVmqeulZkfSNokNoJJH_i",
+        "name": "CODEX-GALLERY.md",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "md5Checksum": "dcec9e742bfd599f71e40e4e9fce9e9f",
+        "mimeType": "text/texmacs",
+        "parents": [
+          "14RNfOAXyZbreIRO0sd5dqZUm-TDYfk1m"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1U4EWHCEZjG6zvJbUUK7MWFQ3z7mcSlB0/view?usp=drivesdk",
+        "size": "2848",
+        "id": "1U4EWHCEZjG6zvJbUUK7MWFQ3z7mcSlB0",
+        "name": "pixeldrive.logic.test.ts",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "md5Checksum": "8a62b8963f3f258b973228693081a1cf",
+        "mimeType": "text/texmacs",
+        "parents": [
+          "19E5FQPmLMB524uiyIxvfmDSf10lMLUMn"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/1DXZ5j7s6NGKBbCOrrkZ_2IkM9VwpAAi-/view?usp=drivesdk",
+        "size": "328",
+        "id": "1DXZ5j7s6NGKBbCOrrkZ_2IkM9VwpAAi-",
+        "name": "gallery-session.ts",
+        "modifiedTime": "2026-08-26T00:19:04.000Z"
+      },
+      {
+        "md5Checksum": "12cb6cb3f94b5806f3f765d16a31bf0e",
+        "mimeType": "text/markdown",
+        "parents": [
+          "15dlUChMWhgxGFmC6IfWUvrU7Y5d_A0xt"
+        ],
+        "webViewLink": "https://drive.google.com/file/d/11LgPrjMjpVk9m628wSdga0trRMyEHXSu/view?usp=drivesdk",
+        "size": "2964",
+        "id": "11LgPrjMjpVk9m628wSdga0trRMyEHXSu",
+        "name": "CODEX-1-GALLERY.md",
+        "modifiedTime": "2026-08-25T16:25:27.028Z"
+      },
+      {
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [
+          "1FjX_Gsr05oJZWv4kcX9Wtcer-CVAbWpU"
+        ],
+        "webViewLink": "https://drive.google.com/drive/folders/15P7FKMSg76DQwBuCwlJL3LdqJ3ZaLtEB",
+        "id": "15P7FKMSg76DQwBuCwlJL3LdqJ3ZaLtEB",
+        "name": "gallery",
+        "modifiedTime": "2026-08-25T16:25:18.109Z"
+      }
+    ],
+    "metadata_scope": "Project source/archive/APK/handoff candidates filtered from name search; unrelated media matches excluded."
+  },
+  {
+    "remote": "gdrive_hayden74",
+    "files": [
+      {
+        "md5Checksum": "a4a55ee636535553d42a50405862de98",
+        "mimeType": "application/zip",
+        "webViewLink": "https://drive.google.com/file/d/1H3wENw-hgCpMemgGmnCwKtZu5cbSKMrs/view?usp=drivesdk",
+        "size": "8748",
+        "id": "1H3wENw-hgCpMemgGmnCwKtZu5cbSKMrs",
+        "name": "Gallery-deployment.zip",
+        "modifiedTime": "2026-10-12T09:22:47.592Z"
+      },
+      {
+        "md5Checksum": "8848697216ff9eeb91d8a4e6617ef065",
+        "mimeType": "text/markdown",
+        "webViewLink": "https://drive.google.com/file/d/19QrrnKM3xrN75wKV64e2Z9qDeMpDlTKs/view?usp=drivesdk",
+        "size": "6644",
+        "id": "19QrrnKM3xrN75wKV64e2Z9qDeMpDlTKs",
+        "name": "Gallery-Gemini-Handoff.md",
+        "modifiedTime": "2026-10-12T09:22:35.579Z"
+      },
+      {
+        "md5Checksum": "8effd264189126dc2e310c434d044112",
+        "mimeType": "application/zip",
+        "webViewLink": "https://drive.google.com/file/d/1P8amfJdfVoHr3zuYWpoSCs3WqJh6PtX1/view?usp=drivesdk",
+        "size": "1427223",
+        "id": "1P8amfJdfVoHr3zuYWpoSCs3WqJh6PtX1",
+        "name": "Gallery-main.zip",
+        "modifiedTime": "2026-10-12T09:22:24.832Z"
+      },
+      {
+        "md5Checksum": "468ec4fde8205538ce3fd4cff8bf3ad7",
+        "mimeType": "application/vnd.android.package-archive",
+        "webViewLink": "https://drive.google.com/file/d/1See6oJflmXe8_uwPUcw9Uu9IcvgLsqfX/view?usp=drivesdk",
+        "size": "93138866",
+        "id": "1See6oJflmXe8_uwPUcw9Uu9IcvgLsqfX",
+        "name": "gallery-phone-test.apk",
+        "modifiedTime": "2026-10-12T09:22:13.870Z"
+      }
+    ],
+    "metadata_scope": "Project source/archive/APK/handoff candidates filtered from name search; unrelated media matches excluded."
+  }
+]

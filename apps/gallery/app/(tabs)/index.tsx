@@ -3,162 +3,1035 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { VideoView, useVideoPlayer } from "expo-video";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { askArchive, DUPLICATE_GROUPS, FIXTURE_FILES, filterLibraryFiles, formatBytes, INITIAL_JOBS, searchFiles, type ChatMessage, type FileRecord } from "@/lib/pixeldrive";
-import { getApiBaseUrl } from "@/constants/oauth";
-import { getGallerySessionToken, setGallerySessionToken } from "@/lib/gallery-session";
+import { StatusBar } from "expo-status-bar";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  AppState,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { useBackend } from "@/lib/backend-provider";
+import {
+  getGallerySessionToken,
+  setGallerySessionToken,
+} from "@/lib/gallery-session";
 import { trpc } from "@/lib/trpc";
+import {
+  cacheDriveFiles,
+  mergeDriveAvailability,
+  safeExternalUrl,
+} from "@/lib/client-runtime";
+import { formatBytes } from "@/lib/pixeldrive";
+import {
+  entryKey,
+  filterAndSort,
+  mergeFolderScan,
+  parseTags,
+  type LibraryEntry,
+  type PhoneFolder,
+  type SortOrder,
+} from "@/lib/local-library";
+import {
+  loadPhoneIndexState,
+  savePhoneIndexState,
+  openPhoneFile,
+  phoneIndexAvailable,
+  pickPhoneFolder,
+  releasePhoneFolder,
+  scanPhoneFolder,
+} from "@/lib/phone-index";
+import {
+  Button,
+  Label,
+  Section,
+  PaletteContext,
+  lightPalette,
+  darkPalette,
+  layout,
+} from "@/components/gallery-ui";
 
-type Tab = "Home" | "Images" | "Search" | "Library" | "Sources";
-type SecondaryScreen = "Reviews" | "Duplicates" | null;
-type Source = { id: string; name: string; status: "Fixture catalogue" | "Connection setup required" | "Connected read-only" | "Unavailable — reconnect required"; itemCount: number; detail: string };
-type DriveFile = { id: string; name: string; mimeType: string; modifiedTime?: string; size?: string; description?: string; webViewLink?: string; hasThumbnail: boolean; mediaGrant: string; thumbnailGrant?: string; sourceId: number; sourceName: string };
-
-const STORE_KEY = "pixeldrive.source-first.v2";
-const tabs: { label: Tab; icon: keyof typeof MaterialIcons.glyphMap }[] = [
-  { label: "Home", icon: "home" }, { label: "Images", icon: "image" }, { label: "Search", icon: "search" }, { label: "Library", icon: "folder" }, { label: "Sources", icon: "storage" },
+type Tab = "Library" | "Search" | "Settings";
+type Appearance = "Light" | "Dark" | "System";
+type DriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  modifiedTime?: string;
+  size?: string;
+  description?: string;
+  webViewLink?: string;
+  mediaGrant?: string;
+  thumbnailGrant?: string;
+  sourceId: number;
+  sourceName: string;
+};
+const PREFS_KEY = "gallery.preferences.v1";
+const nav = [
+  { name: "Library" as const, icon: "folder-open" as const },
+  { name: "Search" as const, icon: "search" as const },
+  { name: "Settings" as const, icon: "tune" as const },
 ];
-const initialSources: Source[] = [{ id: "fixture", name: "Google Drive library", status: "Fixture catalogue", itemCount: 11, detail: "Sample records only — no Google Drive account is linked yet." }];
-const colors = { bg: "#080D18", surface: "#11192C", card: "#17233B", border: "#263554", text: "#F4F7FB", muted: "#A8B4C8", primary: "#2F80ED", cyan: "#50D4FF", success: "#56D49A", warning: "#F6C75B", purple: "#9A7DFF" };
 
-function Icon({ name, color = colors.muted, size = 20 }: { name: keyof typeof MaterialIcons.glyphMap; color?: string; size?: number }) { return <MaterialIcons name={name} color={color} size={size} />; }
-function press(pressed: boolean) { return pressed ? styles.pressed : undefined; }
-function fileIcon(file: FileRecord): keyof typeof MaterialIcons.glyphMap { return file.kind === "Photo" ? "photo" : file.kind === "Video" ? "videocam" : file.kind === "Meme" ? "mood" : file.kind === "Writing" ? "edit-note" : "description"; }
-
-export default function PixelDriveScreen() {
-  const [tab, setTab] = useState<Tab>("Home");
-  const [secondary, setSecondary] = useState<SecondaryScreen>(null);
-  const [files, setFiles] = useState<FileRecord[]>(FIXTURE_FILES);
-  const [sources, setSources] = useState<Source[]>(initialSources);
+export default function GalleryScreen() {
+  const backend = useBackend();
+  const insets = useSafeAreaInsets();
+  const system = useColorScheme();
+  const [tab, setTab] = useState<Tab>("Library");
+  const [appearance, setAppearance] = useState<Appearance>("Light");
+  const [folders, setFolders] = useState<PhoneFolder[]>([]);
+  const [phoneFiles, setPhoneFiles] = useState<LibraryEntry[]>([]);
+  const [tags, setTags] = useState<Record<string, string[]>>({});
+  const [cachedDrive, setCachedDrive] = useState<DriveFile[]>([]);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const pickingRef = useRef(false);
+  const foldersRef = useRef(folders);
+  foldersRef.current = folders;
+  const [message, setMessage] = useState("");
+  const [session, setSession] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
-  const [libraryFilter, setLibraryFilter] = useState("All");
-  const [imageFilter, setImageFilter] = useState("All");
-  const [searchMode, setSearchMode] = useState<"Files" | "Ask">("Files");
-  const [chat, setChat] = useState<ChatMessage[]>([]);
-  const [ask, setAsk] = useState("");
-  const [selectedFile, setSelectedFile] = useState<FileRecord | null>(null);
-  const [selectedDriveFile, setSelectedDriveFile] = useState<DriveFile | null>(null);
-  const [gallerySession, setGallerySession] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const { mutateAsync: createGallerySession } = trpc.session.create.useMutation();
-  const driveSourcesQuery = trpc.googleDrive.list.useQuery(undefined, { enabled: Boolean(gallerySession) });
-  const driveFilesQuery = trpc.googleDrive.files.useQuery(undefined, { enabled: Boolean(gallerySession) });
-  const beginDriveConnect = trpc.googleDrive.beginConnect.useMutation();
+  const [source, setSource] = useState("All");
+  const [sort, setSort] = useState<SortOrder>("Name");
+  const [tagFilter, setTagFilter] = useState("");
+  const [selected, setSelected] = useState<LibraryEntry | null>(null);
+  const [tagText, setTagText] = useState("");
+  const [model, setModel] = useState("");
+  const dark =
+    appearance === "Dark" || (appearance === "System" && system === "dark");
+  const p = dark ? darkPalette : lightPalette;
+  const driveKey = `gallery.drive-cache.v4:${backend.url}`;
+  const { mutateAsync: createSession } = trpc.session.create.useMutation();
+  const sourcesQuery = trpc.googleDrive.list.useQuery(undefined, {
+    enabled: !!session,
+  });
+  const driveQuery = trpc.googleDrive.files.useQuery(undefined, {
+    enabled: !!session,
+    staleTime: 60000,
+    refetchInterval: 240000,
+  });
+  const modelsQuery = trpc.hosted.models.useQuery(undefined, {
+    enabled: !!session,
+    staleTime: 60000,
+  });
+  const connectMutation = trpc.googleDrive.beginConnect.useMutation();
+  const approvedModels = modelsQuery.data ?? [];
+  const selectedModel = approvedModels.find((m) => m.id === model);
 
-  useEffect(() => { AsyncStorage.getItem(STORE_KEY).then((value) => { if (value) try { const state = JSON.parse(value) as { files?: FileRecord[]; sources?: Source[]; chat?: ChatMessage[] }; if (state.files?.length) setFiles(state.files); if (state.sources?.length) setSources(state.sources); if (state.chat) setChat(state.chat); } catch { /* preserve safe fixture defaults */ } setHydrated(true); }); getGallerySessionToken().then(async (token) => { if (token) { setGallerySession(token); return; } const created = await createGallerySession(); await setGallerySessionToken(created.token); setGallerySession(created.token); }).catch(() => undefined); }, [createGallerySession]);
-  useEffect(() => { if (hydrated) AsyncStorage.setItem(STORE_KEY, JSON.stringify({ files, sources, chat })).catch(() => undefined); }, [files, sources, chat, hydrated]);
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      loadPhoneIndexState(),
+      AsyncStorage.getItem(PREFS_KEY),
+      AsyncStorage.getItem(driveKey),
+    ])
+      .then(([local, prefs, drive]) => {
+        if (!active) return;
+        if (local) {
+          const saved = JSON.parse(local);
+          if (saved.version === 1) {
+            setFolders(Array.isArray(saved.folders) ? saved.folders : []);
+            setPhoneFiles(Array.isArray(saved.files) ? saved.files : []);
+            setTags(saved.tags ?? {});
+          }
+        }
+        if (prefs) {
+          const saved = JSON.parse(prefs);
+          if (["Light", "Dark", "System"].includes(saved.appearance))
+            setAppearance(saved.appearance);
+          setModel(typeof saved.model === "string" ? saved.model : "");
+        }
+        if (drive) {
+          const saved = JSON.parse(drive);
+          setCachedDrive(Array.isArray(saved) ? saved : []);
+        }
+      })
+      .catch(() => setMessage("Saved settings could not be read."))
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [driveKey]);
+  useEffect(() => {
+    if (ready)
+      void savePhoneIndexState(
+        JSON.stringify({ version: 1, folders, files: phoneFiles, tags }),
+      ).catch(() => setMessage("The phone index could not be saved."));
+  }, [folders, phoneFiles, tags, ready]);
+  useEffect(() => {
+    if (ready)
+      void AsyncStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({ appearance, model }),
+      ).catch(() => setMessage("Preferences could not be saved."));
+  }, [appearance, model, ready]);
+  useEffect(() => {
+    if (!backend.url) return;
+    let active = true;
+    void getGallerySessionToken()
+      .then(async (token) => {
+        if (!token) {
+          const created = await createSession();
+          token = created.token;
+          await setGallerySessionToken(token);
+        }
+        if (active) setSession(token);
+      })
+      .catch(() => {
+        if (active)
+          setMessage(
+            "Hosted services are temporarily unavailable. Phone files still work.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [backend.url, createSession, attempt]);
+  const groups = useMemo(() => driveQuery.data ?? [], [driveQuery.data]);
+  const liveDrive = useMemo(
+    () =>
+      groups.flatMap((group) =>
+        group.files.map((file) => ({
+          ...file,
+          sourceId: group.source.id,
+          sourceName: group.source.displayName,
+        })),
+      ),
+    [groups],
+  );
+  const driveFiles = useMemo(
+    () =>
+      driveQuery.isSuccess
+        ? mergeDriveAvailability(
+            liveDrive,
+            cachedDrive,
+            groups
+              .filter((g) => g.status === "unavailable")
+              .map((g) => g.source.id),
+          )
+        : cachedDrive,
+    [driveQuery.isSuccess, liveDrive, cachedDrive, groups],
+  );
+  useEffect(() => {
+    if (!driveQuery.isSuccess) return;
+    setCachedDrive((previous) => {
+      const cached = cacheDriveFiles(
+        mergeDriveAvailability(
+          liveDrive,
+          previous,
+          groups
+            .filter((g) => g.status === "unavailable")
+            .map((g) => g.source.id),
+        ),
+      );
+      if (JSON.stringify(previous) === JSON.stringify(cached)) return previous;
+      void AsyncStorage.setItem(driveKey, JSON.stringify(cached)).catch(() =>
+        setMessage("Drive metadata could not be saved."),
+      );
+      return cached;
+    });
+  }, [driveQuery.isSuccess, liveDrive, groups, driveKey]);
+  const entries = useMemo<LibraryEntry[]>(
+    () => [
+      ...phoneFiles,
+      ...driveFiles.map((file) => ({
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size ? Number(file.size) : undefined,
+        modifiedTime: file.modifiedTime
+          ? Date.parse(file.modifiedTime)
+          : undefined,
+        sourceId: `drive:${file.sourceId}`,
+        sourceName: file.sourceName,
+        origin: "drive" as const,
+        description: file.description,
+        webViewLink: file.webViewLink,
+        driveSourceId: file.sourceId,
+        thumbnailGrant: file.thumbnailGrant,
+        mediaGrant: file.mediaGrant,
+      })),
+    ],
+    [phoneFiles, driveFiles],
+  );
+  const visible = useMemo(
+    () => filterAndSort(entries, query, source, sort, tags, tagFilter),
+    [entries, query, source, sort, tags, tagFilter],
+  );
+  const allTags = useMemo(
+    () => [...new Set(entries.flatMap((e) => tags[entryKey(e)] ?? []))].sort(),
+    [entries, tags],
+  );
 
-  const images = useMemo(() => files.filter((file) => !file.isTechnicalSidecar && (file.kind === "Photo" || file.kind === "Meme") && (imageFilter === "All" || imageFilter === "Photos" && file.kind === "Photo" || imageFilter === "Screenshots" && file.sources.some((source) => source.originalPath.toLowerCase().includes("screenshot")) || imageFilter === "Memes" && file.kind === "Meme")), [files, imageFilter]);
-  const library = useMemo(() => filterLibraryFiles(files, libraryFilter, false), [files, libraryFilter]);
-  const results = useMemo(() => searchFiles(files, query), [files, query]);
-  const pendingReview = files.filter((file) => file.reviewState === "NEEDS_REVIEW");
-  const sendAsk = (question = ask) => { const q = question.trim(); if (!q) return; const reply = askArchive(files, q); setChat((current) => [...current, { id: `u-${Date.now()}`, role: "user", content: q }, { id: `a-${Date.now()}`, role: "assistant", content: reply.answer, citations: reply.citations }]); setAsk(""); };
-  const driveGroups = useMemo(() => driveFilesQuery.data ?? [], [driveFilesQuery.data]);
-  const driveFiles = useMemo<DriveFile[]>(() => driveGroups.flatMap((group) => group.files.map((file) => ({ ...file, sourceId: group.source.id, sourceName: group.source.displayName }))), [driveGroups]);
-  const driveImages = useMemo(() => driveFiles.filter((file) => file.mimeType.startsWith("image/") && (imageFilter === "All" || imageFilter === "Photos" || imageFilter === "Screenshots" && /screenshot/i.test(file.name) || imageFilter === "Memes" && /meme/i.test(file.name))), [driveFiles, imageFilter]);
-  const connectedSources = useMemo<Source[]>(() => (driveSourcesQuery.data ?? []).map((source) => { const group = driveGroups.find((item) => item.source.id === source.id); const available = group?.status !== "unavailable"; return { id: `google-${source.id}`, name: source.displayName, status: available ? "Connected read-only" : "Unavailable — reconnect required", itemCount: group?.files.length ?? 0, detail: `${source.email || "Google account"} · ${available ? "read-only viewing" : "authorization or provider unavailable"}` }; }), [driveSourcesQuery.data, driveGroups]);
-  const visibleSources = useMemo(() => [...connectedSources, ...sources], [connectedSources, sources]);
-  const connectGoogleDrive = async () => {
-    if (!gallerySession) return;
-    const configuredOrigin = process.env.EXPO_PUBLIC_GALLERY_RETURN_ORIGIN?.replace(/\/$/, "");
-    const returnUri = Platform.OS === "web" ? `${configuredOrigin || window.location.origin}/oauth/drive` : Linking.createURL("/oauth/drive", { scheme: "ollamabinsaden-gallery" });
-    const result = await beginDriveConnect.mutateAsync({ returnUri });
-    const authResult = await WebBrowser.openAuthSessionAsync(result.authorizationUrl, returnUri);
-    if (authResult.type === "success") await driveSourcesQuery.refetch();
+  const scan = useCallback(async (targets: PhoneFolder[]) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setMessage("");
+    try {
+      for (const folder of targets) {
+        try {
+          const result = await scanPhoneFolder(folder);
+          setPhoneFiles((previous) =>
+            mergeFolderScan(
+              previous,
+              folder.uri,
+              result.files,
+              result.complete,
+            ),
+          );
+          setFolders((previous) =>
+            previous.map((f) =>
+              f.uri === folder.uri
+                ? {
+                    ...f,
+                    lastScan: new Date().toISOString(),
+                    status: result.complete
+                      ? "Up to date"
+                      : `Partial scan · ${result.errors ? "some folders could not be read" : "20,000-item limit reached"}`,
+                  }
+                : f,
+            ),
+          );
+        } catch {
+          setFolders((previous) =>
+            previous.map((f) =>
+              f.uri === folder.uri
+                ? { ...f, status: "Access lost · add this folder again" }
+                : f,
+            ),
+          );
+          setMessage(
+            "A folder needs permission again. Its cached index is still available.",
+          );
+        }
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (!ready || !phoneIndexAvailable) return;
+    void scan(foldersRef.current);
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active" && !pickingRef.current)
+        void scan(foldersRef.current);
+    });
+    return () => listener.remove();
+  }, [ready, scan]);
+  const addFolder = async () => {
+    if (busyRef.current) return;
+    pickingRef.current = true;
+    try {
+      const folder = await pickPhoneFolder();
+      if (!folder) return;
+      setFolders((previous) =>
+        previous.some((f) => f.uri === folder.uri)
+          ? previous
+          : [...previous, folder],
+      );
+      await scan([folder]);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The folder could not be added.",
+      );
+    } finally {
+      pickingRef.current = false;
+    }
   };
-  const openImages = () => setTab("Images");
-  const driveMediaUrl = (file: DriveFile) => `${getApiBaseUrl()}/api/google-drive/media/${file.sourceId}/${encodeURIComponent(file.id)}?grant=${encodeURIComponent(file.mediaGrant)}`;
-  const driveThumbnailUrl = (file: DriveFile) => file.thumbnailGrant ? `${getApiBaseUrl()}/api/google-drive/thumbnail/${file.sourceId}/${encodeURIComponent(file.id)}?grant=${encodeURIComponent(file.thumbnailGrant)}` : undefined;
-  const setReviewState = (id: string, reviewState: FileRecord["reviewState"], reviewEvidence: string) => setFiles((current) => current.map((file) => file.assetId === id ? { ...file, reviewState, reviewEvidence } : file));
-  const setPreferred = (assetId: string, occurrenceId: string) => setFiles((current) => current.map((file) => file.assetId === assetId ? { ...file, preferredSourceOccurrenceId: occurrenceId } : file));
+  const removeFolder = async (folder: PhoneFolder) => {
+    if (busyRef.current) return;
+    try {
+      await releasePhoneFolder(folder);
+      setFolders((previous) => previous.filter((f) => f.uri !== folder.uri));
+      setPhoneFiles((previous) =>
+        previous.filter((f) => f.sourceId !== folder.uri),
+      );
+    } catch {
+      setMessage("The folder could not be removed. Try again.");
+    }
+  };
+  const retry = () => {
+    setMessage("");
+    setAttempt((value) => value + 1);
+    if (session) {
+      void sourcesQuery.refetch();
+      void driveQuery.refetch();
+      void modelsQuery.refetch();
+    }
+  };
+  const connect = async () => {
+    if (!session) {
+      setMessage(
+        backend.url
+          ? "Hosted services are not connected yet. Tap Retry."
+          : "Google Drive will be available when the hosted service is configured.",
+      );
+      return;
+    }
+    try {
+      const returnUri =
+        Platform.OS === "web"
+          ? `${process.env.EXPO_PUBLIC_GALLERY_RETURN_ORIGIN || window.location.origin}/oauth/drive`
+          : Linking.createURL("/oauth/drive", {
+              scheme: "ollamabinsaden-gallery",
+            });
+      const result = await connectMutation.mutateAsync({ returnUri });
+      const auth = await WebBrowser.openAuthSessionAsync(
+        result.authorizationUrl,
+        returnUri,
+      );
+      if (auth.type === "success") {
+        void sourcesQuery.refetch();
+        void driveQuery.refetch();
+      }
+    } catch {
+      setMessage("Google sign-in could not finish. Please try again.");
+    }
+  };
+  const open = async () => {
+    if (!selected) return;
+    try {
+      if (selected.origin === "phone") await openPhoneFile(selected);
+      else {
+        const url = safeExternalUrl(selected.webViewLink);
+        if (url) await Linking.openURL(url);
+        else setMessage("This file has no available original link.");
+      }
+    } catch {
+      setMessage(
+        "The file could not be opened. Check folder access or install an app for this file type.",
+      );
+    }
+  };
+  const thumbnail = (entry: LibraryEntry) =>
+    entry.origin === "phone" && entry.mimeType.startsWith("image/")
+      ? entry.uri
+      : entry.thumbnailGrant
+        ? `${backend.url}/api/google-drive/thumbnail/${entry.driveSourceId}/${encodeURIComponent(entry.id)}?grant=${encodeURIComponent(entry.thumbnailGrant)}`
+        : undefined;
+  const error =
+    message ||
+    (driveQuery.isError
+      ? "Google Drive is offline. Saved metadata is still available."
+      : "");
+  const actions = (
+    <View style={{ gap: 10, alignSelf: "stretch" }}>
+      <Button
+        title="Add phone folder"
+        icon="create-new-folder"
+        primary
+        disabled={busy}
+        onPress={() => void addFolder()}
+      />
+      <Button
+        title="Connect Google Drive"
+        disabled={connectMutation.isPending}
+        onPress={() => void connect()}
+      />
+    </View>
+  );
+  const chips = (
+    values: string[],
+    value: string,
+    onSelect: (value: string) => void,
+  ) => (
+    <ScrollView
+      horizontal
+      style={{ flexGrow: 0, flexShrink: 0 }}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 7, paddingVertical: 2 }}
+    >
+      {values.map((item) => (
+        <Pressable
+          key={item}
+          accessibilityRole="button"
+          accessibilityState={{ selected: value === item }}
+          onPress={() => onSelect(item)}
+          style={{
+            paddingVertical: 10,
+            paddingHorizontal: 13,
+            borderRadius: 10,
+            backgroundColor: value === item ? p.tint : p.surface,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: value === item ? "600" : "400",
+              color: value === item ? p.accent : p.muted,
+            }}
+          >
+            {item}
+          </Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
 
-  if (!hydrated) return <SafeAreaView style={styles.safe}><View style={styles.center}><ActivityIndicator color={colors.cyan} /><Text style={styles.muted}>Opening your archive…</Text></View></SafeAreaView>;
-  return <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}><View style={styles.root}><View style={styles.content}>
-    {secondary === "Reviews" ? <Reviews files={pendingReview} onBack={() => setSecondary(null)} onApprove={(id) => setReviewState(id, "APPROVED", "Manual review approved")} onSkip={(id) => setReviewState(id, "SKIPPED", "Skipped by archive owner")} onFile={setSelectedFile} /> : secondary === "Duplicates" ? <Duplicates files={files} onBack={() => setSecondary(null)} onPreferred={setPreferred} onFile={setSelectedFile} /> : <>
-      {tab === "Home" && <Home files={files} sources={visibleSources} onImages={openImages} onSearch={() => setTab("Search")} onLibrary={() => setTab("Library")} onSources={() => setTab("Sources")} />}
-      {tab === "Images" && <Images files={images} driveFiles={driveImages} mediaUrl={driveMediaUrl} thumbnailUrl={driveThumbnailUrl} filter={imageFilter} onFilter={setImageFilter} onFile={setSelectedFile} onDriveFile={setSelectedDriveFile} />}
-      {tab === "Search" && <Search mode={searchMode} query={query} results={results} ask={ask} chat={chat} files={files} onMode={setSearchMode} onQuery={setQuery} onAsk={setAsk} onSend={sendAsk} onFile={setSelectedFile} />}
-      {tab === "Library" && <Library files={library} driveFiles={filterDriveLibraryFiles(driveFiles, libraryFilter)} mediaUrl={driveMediaUrl} thumbnailUrl={driveThumbnailUrl} filter={libraryFilter} pending={pendingReview.length} onFilter={setLibraryFilter} onFile={setSelectedFile} onDriveFile={setSelectedDriveFile} onReviews={() => setSecondary("Reviews")} onDuplicates={() => setSecondary("Duplicates")} />}
-      {tab === "Sources" && <Sources sources={visibleSources} authenticating={beginDriveConnect.isPending} onConnect={connectGoogleDrive} />}
-    </>}
-  </View><Nav current={tab} onSelect={setTab} /></View><Detail file={selectedFile} onClose={() => setSelectedFile(null)} /><DriveDetail file={selectedDriveFile} mediaUrl={driveMediaUrl} onClose={() => setSelectedDriveFile(null)} /></SafeAreaView>;
+  return (
+    <PaletteContext.Provider value={p}>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: p.bg }}
+        edges={["top", "left", "right"]}
+      >
+        <StatusBar style={dark ? "light" : "dark"} />
+        {!ready ? (
+          <View style={{ flex: 1, justifyContent: "center" }}>
+            <ActivityIndicator color={p.accent} />
+          </View>
+        ) : (
+          <>
+            <View
+              style={{
+                paddingHorizontal: 22,
+                paddingTop: 15,
+                paddingBottom: 14,
+                gap: 3,
+              }}
+            >
+              <Text
+                style={{
+                  color: p.text,
+                  fontSize: 32,
+                  fontWeight: "600",
+                  letterSpacing: -1,
+                }}
+              >
+                {tab === "Library" ? "Gallery" : tab}
+              </Text>
+              {tab === "Library" && <Label muted>Your files, together.</Label>}
+            </View>
+            {!!error && (
+              <View
+                style={{
+                  backgroundColor: p.tint,
+                  padding: 14,
+                  marginHorizontal: 22,
+                  borderRadius: 12,
+                  marginBottom: 12,
+                  gap: 10,
+                }}
+              >
+                <Label>{error}</Label>
+                <Button title="Dismiss" onPress={() => setMessage("")} />
+              </View>
+            )}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={[layout.page, { flexGrow: 1 }]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {tab === "Settings" ? (
+                <>
+                  <Section title="Appearance">
+                    {chips(["Light", "Dark", "System"], appearance, (v) =>
+                      setAppearance(v as Appearance),
+                    )}
+                  </Section>
+                  <Section title="Phone folders">
+                    <Label muted>
+                      Only an index is saved. Files stay on your phone and are
+                      never uploaded by a scan.
+                    </Label>
+                    <Button
+                      title="Add phone folder"
+                      primary
+                      disabled={busy}
+                      onPress={() => void addFolder()}
+                    />
+                    {!phoneIndexAvailable && (
+                      <Label muted>
+                        Folder access is available in the Android app.
+                      </Label>
+                    )}
+                    {folders.map((folder) => (
+                      <View
+                        key={folder.uri}
+                        style={{
+                          borderBottomWidth: 1,
+                          borderColor: p.line,
+                          paddingVertical: 12,
+                          gap: 8,
+                        }}
+                      >
+                        <Label>{folder.name}</Label>
+                        <Label muted>
+                          {folder.status ?? "Ready to scan"}
+                          {folder.lastScan
+                            ? ` · ${new Date(folder.lastScan).toLocaleString()}`
+                            : ""}
+                        </Label>
+                        <View style={layout.wrap}>
+                          <Button
+                            title="Rescan"
+                            disabled={busy}
+                            onPress={() => void scan([folder])}
+                          />
+                          <Button
+                            title="Remove folder"
+                            disabled={busy}
+                            onPress={() => void removeFolder(folder)}
+                          />
+                        </View>
+                      </View>
+                    ))}
+                    <Label muted>
+                      Folders refresh when Gallery opens or returns to the
+                      foreground. Android restricts access to some storage
+                      locations.
+                    </Label>
+                  </Section>
+                  <Section title="Google Drive">
+                    <Label muted>
+                      Connect your Google account for read-only browsing.
+                    </Label>
+                    {(sourcesQuery.data ?? []).map((s) => (
+                      <View key={s.id} style={{ gap: 3 }}>
+                        <Label>{s.displayName}</Label>
+                        <Label muted>
+                          {s.email || "Google account"} ·{" "}
+                          {groups.find((g) => g.source.id === s.id)?.status ===
+                          "available"
+                            ? "Connected"
+                            : "Reconnect needed"}
+                        </Label>
+                      </View>
+                    ))}
+                    <Button
+                      title="Connect Google Drive"
+                      disabled={connectMutation.isPending}
+                      onPress={() => void connect()}
+                    />
+                  </Section>
+                  <Section title="Hosted models">
+                    <Label muted>
+                      We provide the server, runtime and customised models.
+                      Choose an available model below.
+                    </Label>
+                    {approvedModels.length ? (
+                      approvedModels.map((m) => (
+                        <Pressable
+                          key={m.id}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: model === m.id }}
+                          onPress={() => setModel(m.id)}
+                          style={{
+                            padding: 16,
+                            borderRadius: 12,
+                            backgroundColor:
+                              model === m.id ? p.tint : p.surface,
+                            gap: 4,
+                          }}
+                        >
+                          <Label>
+                            {m.name}
+                            {model === m.id ? " · Selected" : ""}
+                          </Label>
+                          <Label muted>{m.description}</Label>
+                        </Pressable>
+                      ))
+                    ) : (
+                      <Label muted>No models available yet.</Label>
+                    )}
+                    {model && !selectedModel && (
+                      <Label muted>
+                        Your saved model is currently unavailable.
+                      </Label>
+                    )}
+                    <Label muted>
+                      Phone file content is not sent to hosted AI. AI tagging
+                      and answers will become available after the hosted
+                      integration is connected.
+                    </Label>
+                  </Section>
+                  <Section title="Hosted service">
+                    <Label muted>
+                      {backend.url
+                        ? session
+                          ? "Connected to Gallery hosting."
+                          : "Gallery hosting is temporarily unavailable."
+                        : "Hosted services are being prepared."}
+                    </Label>
+                    <Button title="Retry" onPress={retry} />
+                  </Section>
+                  <Section title="Companion apps">
+                    <View style={layout.wrap}>
+                      {(["assist", "extract"] as const).map((name) => (
+                        <Button
+                          key={name}
+                          title={
+                            name === "assist" ? "Open Assist" : "Open Extract"
+                          }
+                          onPress={() =>
+                            void Linking.openURL(
+                              `ollamabinsaden-${name}://`,
+                            ).catch(() =>
+                              setMessage(
+                                "The companion app could not be opened.",
+                              ),
+                            )
+                          }
+                        />
+                      ))}
+                    </View>
+                  </Section>
+                  <Label muted>
+                    Gallery 1.1.0 · Files remain in their original locations.
+                  </Label>
+                </>
+              ) : (
+                <>
+                  {tab === "Search" && (
+                    <TextInput
+                      accessibilityLabel="Search files and tags"
+                      placeholder="Search files and tags"
+                      placeholderTextColor={p.muted}
+                      value={query}
+                      onChangeText={setQuery}
+                      style={[
+                        layout.input,
+                        {
+                          borderColor: p.line,
+                          color: p.text,
+                          backgroundColor: p.surface,
+                        },
+                      ]}
+                      autoCapitalize="none"
+                    />
+                  )}
+                  {entries.length > 0 && (
+                    <>
+                      <View style={layout.row}>
+                        <View style={{ flex: 1 }}>
+                          {chips(
+                            ["All", "Phone", "Drive"],
+                            source === "phone"
+                              ? "Phone"
+                              : source === "drive"
+                                ? "Drive"
+                                : "All",
+                            (v) => setSource(v === "All" ? v : v.toLowerCase()),
+                          )}
+                        </View>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Refresh sources"
+                          disabled={busy}
+                          onPress={() => {
+                            void scan(folders);
+                            if (session) void driveQuery.refetch();
+                          }}
+                          style={{ padding: 11 }}
+                        >
+                          {busy ? (
+                            <ActivityIndicator color={p.accent} />
+                          ) : (
+                            <MaterialIcons
+                              name="refresh"
+                              size={23}
+                              color={p.accent}
+                            />
+                          )}
+                        </Pressable>
+                      </View>
+                      <Label muted>Sort by</Label>
+                      {chips(["Name", "Date", "Size", "Type"], sort, (v) =>
+                        setSort(v as SortOrder),
+                      )}
+                      {allTags.length > 0 && (
+                        <>
+                          {chips(
+                            ["All tags", ...allTags],
+                            tagFilter || "All tags",
+                            (v) => setTagFilter(v === "All tags" ? "" : v),
+                          )}
+                        </>
+                      )}
+                      <Label muted>
+                        {visible.length}{" "}
+                        {visible.length === 1 ? "file" : "files"}
+                        {busy ? " · Scanning…" : ""}
+                      </Label>
+                    </>
+                  )}
+                  {entries.length === 0 ? (
+                    <View style={layout.center}>
+                      <MaterialIcons
+                        name="folder-open"
+                        size={44}
+                        color={p.accent}
+                      />
+                      <Label large>Your library starts here</Label>
+                      <Label muted>
+                        Add a phone folder or connect Google Drive. Search, sort
+                        and tag your files in one place.
+                      </Label>
+                      {actions}
+                      {busy && <ActivityIndicator color={p.accent} />}
+                    </View>
+                  ) : visible.length === 0 ? (
+                    <View style={layout.center}>
+                      <Label large>No matching files</Label>
+                      <Label muted>
+                        Try another search or clear your filters.
+                      </Label>
+                      <Button
+                        title="Clear filters"
+                        onPress={() => {
+                          setQuery("");
+                          setSource("All");
+                          setTagFilter("");
+                        }}
+                      />
+                    </View>
+                  ) : (
+                    visible.slice(0, 250).map((entry) => (
+                      <Pressable
+                        key={entryKey(entry)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open details for ${entry.name}`}
+                        onPress={() => {
+                          setSelected(entry);
+                          setTagText((tags[entryKey(entry)] ?? []).join(", "));
+                        }}
+                        style={({ pressed }) => [
+                          {
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 13,
+                            paddingVertical: 13,
+                            borderBottomWidth: 1,
+                            borderColor: p.line,
+                            opacity: pressed ? 0.65 : 1,
+                          },
+                        ]}
+                      >
+                        {thumbnail(entry) ? (
+                          <Image
+                            source={{ uri: thumbnail(entry) }}
+                            style={{ width: 48, height: 48, borderRadius: 8 }}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: 8,
+                              backgroundColor: p.surface,
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <MaterialIcons
+                              name={
+                                entry.mimeType.startsWith("image/")
+                                  ? "image"
+                                  : entry.mimeType.startsWith("video/")
+                                    ? "videocam"
+                                    : "description"
+                              }
+                              size={23}
+                              color={p.accent}
+                            />
+                          </View>
+                        )}
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              color: p.text,
+                              fontSize: 15,
+                              fontWeight: "500",
+                              lineHeight: 21,
+                            }}
+                          >
+                            {entry.name}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={{ color: p.muted, fontSize: 12 }}
+                          >
+                            {entry.origin === "phone" ? "Phone" : "Drive"} ·{" "}
+                            {entry.sourceName}
+                            {entry.size !== undefined
+                              ? ` · ${formatBytes(entry.size)}`
+                              : ""}
+                          </Text>
+                          {!!tags[entryKey(entry)]?.length && (
+                            <Text
+                              numberOfLines={1}
+                              style={{ color: p.accent, fontSize: 12 }}
+                            >
+                              {tags[entryKey(entry)].join(" · ")}
+                            </Text>
+                          )}
+                        </View>
+                        <MaterialIcons
+                          name="chevron-right"
+                          size={20}
+                          color={p.muted}
+                        />
+                      </Pressable>
+                    ))
+                  )}
+                  {visible.length > 250 && (
+                    <Label muted>
+                      Showing the first 250 matches. Use Search or filters to
+                      narrow the list.
+                    </Label>
+                  )}
+                  {entries.length > 0 && tab === "Library" && actions}
+                </>
+              )}
+            </ScrollView>
+            <View
+              style={[
+                layout.nav,
+                {
+                  borderColor: p.line,
+                  backgroundColor: p.bg,
+                  paddingBottom: Math.max(insets.bottom, 12),
+                },
+              ]}
+            >
+              {nav.map((item) => (
+                <Pressable
+                  key={item.name}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: tab === item.name }}
+                  onPress={() => setTab(item.name)}
+                  style={layout.navItem}
+                >
+                  <MaterialIcons
+                    name={item.icon}
+                    size={23}
+                    color={tab === item.name ? p.accent : p.muted}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: tab === item.name ? p.accent : p.muted,
+                      fontWeight: tab === item.name ? "600" : "400",
+                    }}
+                  >
+                    {item.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+        <Modal
+          visible={!!selected}
+          animationType="slide"
+          onRequestClose={() => setSelected(null)}
+        >
+          <SafeAreaView
+            style={{ flex: 1, backgroundColor: p.bg }}
+            edges={["top", "bottom", "left", "right"]}
+          >
+            <ScrollView
+              contentContainerStyle={layout.details}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Button title="Close" onPress={() => setSelected(null)} />
+              {selected && (
+                <>
+                  <Label large>{selected.name}</Label>
+                  {thumbnail(selected) && (
+                    <Image
+                      source={{ uri: thumbnail(selected) }}
+                      style={{ height: 240, borderRadius: 12 }}
+                      contentFit="contain"
+                    />
+                  )}
+                  <Label muted>
+                    {selected.origin === "phone" ? "Phone" : "Google Drive"} ·{" "}
+                    {selected.sourceName}
+                  </Label>
+                  <Label muted>
+                    {selected.relativePath ??
+                      selected.description ??
+                      selected.mimeType}
+                  </Label>
+                  <Label muted>
+                    {selected.size !== undefined
+                      ? formatBytes(selected.size)
+                      : "Size unavailable"}
+                    {selected.modifiedTime
+                      ? ` · ${new Date(selected.modifiedTime).toLocaleDateString()}`
+                      : ""}
+                  </Label>
+                  <Button
+                    title={
+                      selected.origin === "phone"
+                        ? "Open on phone"
+                        : "Open in Google Drive"
+                    }
+                    primary
+                    onPress={() => void open()}
+                  />
+                  <Section title="Tags">
+                    <Label muted>
+                      Add tags separated by commas. Your edits stay saved on
+                      this device when folders are rescanned.
+                    </Label>
+                    <TextInput
+                      accessibilityLabel="File tags"
+                      value={tagText}
+                      onChangeText={setTagText}
+                      placeholder="e.g. Car, Receipts, Holiday"
+                      placeholderTextColor={p.muted}
+                      style={[
+                        layout.input,
+                        { color: p.text, borderColor: p.line },
+                      ]}
+                      multiline
+                    />
+                    <Button
+                      title="Save tags"
+                      primary
+                      onPress={() => {
+                        setTags((previous) => ({
+                          ...previous,
+                          [entryKey(selected)]: parseTags(tagText),
+                        }));
+                        setSelected(null);
+                      }}
+                    />
+                  </Section>
+                  {selected.origin === "phone" && (
+                    <Label muted>
+                      This file stays on your phone. Only its metadata and your
+                      tags are stored in Gallery.
+                    </Label>
+                  )}
+                </>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+      </SafeAreaView>
+    </PaletteContext.Provider>
+  );
 }
-
-function filterDriveLibraryFiles(files: DriveFile[], filter: string) {
-  if (filter === "All") return files;
-  if (filter === "Videos") return files.filter((file) => file.mimeType.startsWith("video/"));
-  if (filter === "Documents") return files.filter((file) => /pdf|document|word|sheet|presentation/i.test(file.mimeType));
-  if (filter === "Writing") return files.filter((file) => /text|markdown/i.test(file.mimeType));
-  // Project membership cannot be inferred honestly from Drive metadata alone.
-  if (filter === "Work / Projects") return [];
-  return files;
-}
-
-function Home({ files, sources, onImages, onSearch, onLibrary, onSources }: { files: FileRecord[]; sources: Source[]; onImages: () => void; onSearch: () => void; onLibrary: () => void; onSources: () => void }) {
-  const recent = files.filter((file) => file.kind === "Photo" || file.kind === "Meme").slice(0, 4);
-  return <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}><View style={styles.homeHead}><View><Text style={styles.brand}>PixelDrive</Text><Text style={styles.subtitle}>A quieter way to find your archive</Text></View><Pressable onPress={onSources} style={({ pressed }) => [styles.sourceChip, press(pressed)]}><Icon name="storage" color={colors.cyan} size={15} /><Text style={styles.sourceChipText}>{sources.length} source{sources.length === 1 ? "" : "s"}</Text></Pressable></View><Pressable onPress={onSearch} style={({ pressed }) => [styles.searchCall, press(pressed)]}><Icon name="search" color={colors.cyan} /><Text style={styles.searchCallText}>Search files, notes, and memories</Text><Icon name="arrow-forward" color={colors.muted} size={18} /></Pressable><View style={styles.sourceCard}><View style={styles.row}><View style={styles.sourceIcon}><Icon name="lock" color={colors.success} /></View><View style={styles.flex}><Text style={styles.cardTitle}>Your sources stay read-only</Text><Text style={styles.cardSub}>Link one or more Google Drives from Sources. PixelDrive never changes originals.</Text></View></View><Pressable onPress={onSources} style={({ pressed }) => [styles.textAction, press(pressed)]}><Text style={styles.textActionLabel}>Manage sources</Text><Icon name="chevron-right" color={colors.cyan} size={17} /></Pressable></View><View style={styles.sectionHead}><Text style={styles.sectionTitle}>Recent images</Text><Pressable onPress={onImages}><Text style={styles.seeAll}>See all</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imageRow}>{recent.map((file) => <Pressable key={file.assetId} onPress={onImages} style={({ pressed }) => [styles.recentCard, press(pressed)]}><FileVisual file={file} size={112} /><Text style={styles.recentTitle} numberOfLines={1}>{file.fileName}</Text><Text style={styles.recentMeta}>{file.category}</Text></Pressable>)}</ScrollView><View style={styles.quickRow}><Quick icon="image" label="Images" detail={`${recent.length} visual items`} onPress={onImages} /><Quick icon="folder" label="Library" detail={`${files.length - 1} files`} onPress={onLibrary} /><Quick icon="storage" label="Sources" detail={`${sources.length} connected`} onPress={onSources} /></View><Text style={styles.footnote}>Review items and duplicate groups live in Library, so Home stays focused on finding and browsing.</Text></ScrollView>;
-}
-
-function Images({ files, driveFiles, mediaUrl, thumbnailUrl, filter, onFilter, onFile, onDriveFile }: { files: FileRecord[]; driveFiles: DriveFile[]; mediaUrl: (file: DriveFile) => string; thumbnailUrl: (file: DriveFile) => string | undefined; filter: string; onFilter: (filter: string) => void; onFile: (file: FileRecord) => void; onDriveFile: (file: DriveFile) => void }) { return <View style={styles.screen}><View style={styles.header}><View><Text style={styles.title}>Images</Text><Text style={styles.subtitle}>Your linked Drive visuals appear here without changing originals</Text></View><View style={styles.roundIcon}><Icon name="image" color={colors.cyan} /></View></View><Filter values={["All", "Photos", "Screenshots", "Memes"]} value={filter} onChange={onFilter} /><ScrollView contentContainerStyle={styles.driveScroll}>{driveFiles.length > 0 && <><Text style={styles.mediaSection}>Linked Drive images</Text><View style={styles.gridRow}>{driveFiles.map((item) => <Pressable key={`${item.sourceId}-${item.id}`} onPress={() => onDriveFile(item)} style={({ pressed }) => [styles.imageTile, styles.remoteTile, press(pressed)]}><Image source={thumbnailUrl(item)} style={styles.remoteImage} contentFit="cover" transition={180} /><View style={styles.imageOverlay}><Text style={styles.imageName} numberOfLines={1}>{item.name}</Text><Text style={styles.imageMeta}>{item.sourceName}</Text></View></Pressable>)}</View></>}<Text style={styles.mediaSection}>Archive samples</Text><View style={styles.gridRow}>{files.map((item) => <Pressable key={item.assetId} onPress={() => onFile(item)} style={({ pressed }) => [styles.imageTile, styles.remoteTile, press(pressed)]}><FileVisual file={item} size={150} /><View style={styles.imageOverlay}><Text style={styles.imageName} numberOfLines={1}>{item.fileName}</Text><Text style={styles.imageMeta}>{item.dateTaken}</Text></View></Pressable>)}</View>{!files.length && !driveFiles.length && <Empty title="No images match this view" text="Link a Drive from Sources to view its images here." />}</ScrollView></View>; }
-
-function Search({ mode, query, results, ask, chat, files, onMode, onQuery, onAsk, onSend, onFile }: { mode: "Files" | "Ask"; query: string; results: FileRecord[]; ask: string; chat: ChatMessage[]; files: FileRecord[]; onMode: (mode: "Files" | "Ask") => void; onQuery: (query: string) => void; onAsk: (ask: string) => void; onSend: (question?: string) => void; onFile: (file: FileRecord) => void }) { return <View style={styles.screen}><Text style={styles.title}>Search</Text><Text style={styles.subtitle}>Start with files. Ask the archive when you need a broader answer.</Text><View style={styles.segment}>{(["Files", "Ask"] as const).map((value) => <Pressable key={value} onPress={() => onMode(value)} style={({ pressed }) => [styles.segmentItem, mode === value && styles.segmentActive, press(pressed)]}><Text style={[styles.segmentText, mode === value && styles.segmentTextActive]}>{value === "Ask" ? "Ask archive" : "Find files"}</Text></Pressable>)}</View>{mode === "Files" ? <><View style={styles.input}><Icon name="search" color={colors.cyan} /><TextInput value={query} onChangeText={onQuery} placeholder="Search names, tags, text, notes" placeholderTextColor={colors.muted} style={styles.inputText} returnKeyType="search" /></View>{!query ? <View style={styles.searchStart}><Text style={styles.emptyTitle}>What do you remember?</Text><Text style={styles.cardSub}>A filename, a topic, visual detail, document type, or category all work.</Text>{["Housing", "Speaker wires", "Resume"].map((example) => <Pressable key={example} onPress={() => onQuery(example)} style={({ pressed }) => [styles.example, press(pressed)]}><Text style={styles.exampleText}>{example}</Text><Icon name="north-east" color={colors.cyan} size={15} /></Pressable>)}</View> : <FlatList data={results} contentContainerStyle={styles.list} keyExtractor={(file) => file.assetId} renderItem={({ item }) => <FileRow file={item} onPress={() => onFile(item)} />} ListEmptyComponent={<Empty title="Nothing found" text="Try a simpler term or check a different source." />} />}</> : <AskView ask={ask} chat={chat} files={files} onAsk={onAsk} onSend={onSend} onFile={onFile} />}</View>; }
-
-function AskView({ ask, chat, files, onAsk, onSend, onFile }: { ask: string; chat: ChatMessage[]; files: FileRecord[]; onAsk: (ask: string) => void; onSend: (question?: string) => void; onFile: (file: FileRecord) => void }) { return <View style={styles.askWrap}>{chat.length ? <FlatList data={chat} contentContainerStyle={styles.chat} keyExtractor={(item) => item.id} renderItem={({ item }) => <View style={[styles.bubble, item.role === "user" ? styles.userBubble : styles.assistantBubble]}><Text style={styles.bubbleRole}>{item.role === "user" ? "You" : "PixelDrive"}</Text><Text style={styles.bubbleText}>{item.content}</Text>{item.citations?.map((id) => { const file = files.find((entry) => entry.assetId === id); return file ? <Pressable key={id} onPress={() => onFile(file)} style={({ pressed }) => [styles.citation, press(pressed)]}><Icon name="insert-drive-file" color={colors.cyan} size={13} /><Text style={styles.citationText}>{file.fileName}</Text></Pressable> : null; })}</View>} /> : <View style={styles.askIntro}><Icon name="psychology" color={colors.cyan} size={28} /><Text style={styles.emptyTitle}>Ask your catalogue</Text><Text style={styles.cardSub}>Answers are grounded in stored file records. No generative-AI key is used.</Text><Pressable onPress={() => onSend("What files relate to housing?")} style={({ pressed }) => [styles.example, press(pressed)]}><Text style={styles.exampleText}>What files relate to housing?</Text><Icon name="arrow-forward" color={colors.cyan} size={15} /></Pressable></View>}<View style={styles.composer}><TextInput value={ask} onChangeText={onAsk} placeholder="Ask about this archive" placeholderTextColor={colors.muted} style={styles.composerText} multiline /><Pressable onPress={() => onSend()} disabled={!ask.trim()} style={({ pressed }) => [styles.send, !ask.trim() && styles.disabled, press(pressed)]}><Icon name="send" color={colors.bg} /></Pressable></View></View>; }
-
-function Library({ files, driveFiles, mediaUrl, thumbnailUrl, filter, pending, onFilter, onFile, onDriveFile, onReviews, onDuplicates }: { files: FileRecord[]; driveFiles: DriveFile[]; mediaUrl: (file: DriveFile) => string; thumbnailUrl: (file: DriveFile) => string | undefined; filter: string; pending: number; onFilter: (filter: string) => void; onFile: (file: FileRecord) => void; onDriveFile: (file: DriveFile) => void; onReviews: () => void; onDuplicates: () => void }) { return <View style={styles.screen}><View style={styles.header}><View><Text style={styles.title}>Library</Text><Text style={styles.subtitle}>Every file, one calm place</Text></View><View style={styles.roundIcon}><Icon name="folder" color={colors.cyan} /></View></View><View style={styles.secondaryLinks}><Pressable onPress={onReviews} style={({ pressed }) => [styles.secondaryLink, press(pressed)]}><Icon name="pending-actions" color={colors.warning} size={17} /><Text style={styles.secondaryLinkText}>Reviews{pending ? ` (${pending})` : ""}</Text><Icon name="chevron-right" color={colors.muted} size={17} /></Pressable><Pressable onPress={onDuplicates} style={({ pressed }) => [styles.secondaryLink, press(pressed)]}><Icon name="content-copy" color={colors.purple} size={17} /><Text style={styles.secondaryLinkText}>Duplicates ({DUPLICATE_GROUPS.length})</Text><Icon name="chevron-right" color={colors.muted} size={17} /></Pressable></View><Filter values={["All", "Documents", "Videos", "Writing", "Work / Projects"]} value={filter} onChange={onFilter} /><ScrollView contentContainerStyle={styles.driveScroll}>{driveFiles.length > 0 && <><Text style={styles.mediaSection}>Linked Drive files</Text>{driveFiles.map((item) => <DriveFileRow key={`${item.sourceId}-${item.id}`} file={item} previewUrl={thumbnailUrl(item)} onPress={() => onDriveFile(item)} />)}</>}<Text style={styles.mediaSection}>Archive samples</Text>{files.map((item) => <FileRow key={item.assetId} file={item} onPress={() => onFile(item)} />)}{!files.length && !driveFiles.length && <Empty title="No files here" text="Link a source from Sources to view its files." />}</ScrollView></View>; }
-
-function Reviews({ files, onBack, onApprove, onSkip, onFile }: { files: FileRecord[]; onBack: () => void; onApprove: (id: string) => void; onSkip: (id: string) => void; onFile: (file: FileRecord) => void }) { return <View style={styles.screen}><SecondaryHeader title="Reviews" subtitle="Decide only when a category needs your judgment" onBack={onBack} /><FlatList data={files} contentContainerStyle={styles.list} keyExtractor={(file) => file.assetId} renderItem={({ item }) => <View style={styles.reviewItem}><Pressable onPress={() => onFile(item)} style={({ pressed }) => [styles.row, press(pressed)]}><FileVisual file={item} size={48} /><View style={styles.flex}><Text style={styles.fileName}>{item.fileName}</Text><Text style={styles.fileMeta}>Suggested: {item.category} · {Math.round(item.confidence * 100)}% confidence</Text></View></Pressable><Text style={styles.reviewEvidence}>{item.reviewEvidence}</Text><View style={styles.reviewActions}><SmallAction label="Approve" icon="check" color={colors.success} onPress={() => onApprove(item.assetId)} /><SmallAction label="Skip" icon="skip-next" color={colors.muted} onPress={() => onSkip(item.assetId)} /></View></View>} ListEmptyComponent={<Empty title="Nothing needs review" text="All current suggestions have been handled." />} /></View>; }
-
-function Duplicates({ files, onBack, onPreferred, onFile }: { files: FileRecord[]; onBack: () => void; onPreferred: (assetId: string, occurrenceId: string) => void; onFile: (file: FileRecord) => void }) { return <ScrollView contentContainerStyle={styles.scroll}><SecondaryHeader title="Duplicates" subtitle="Exact occurrences and near-duplicate assets stay distinct" onBack={onBack} />{DUPLICATE_GROUPS.map((group) => { const members = files.filter((file) => group.assetIds.includes(file.assetId)); return <View key={group.id} style={styles.duplicateGroup}><View style={styles.rowBetween}><Text style={styles.cardTitle}>{group.type === "Exact" ? `${group.occurrenceIds?.length ?? 0} source occurrences` : `${members.length} related assets`}</Text><Text style={styles.duplicateType}>{group.type}</Text></View><Text style={styles.cardSub}>{group.reason}{group.wastedBytes ? ` · ${formatBytes(group.wastedBytes)} repeated bytes` : ""}</Text>{group.type === "Exact" ? members.flatMap((file) => file.sources.map((source) => <View key={source.sourceOccurrenceId} style={styles.duplicateMember}><Pressable onPress={() => onFile(file)} style={({ pressed }) => [styles.row, styles.flex, press(pressed)]}><FileVisual file={file} size={38} /><View style={styles.flex}><Text style={styles.fileName}>{file.fileName}</Text><Text style={styles.fileMeta}>{source.originalPath}</Text></View></Pressable>{file.preferredSourceOccurrenceId === source.sourceOccurrenceId ? <Text style={styles.preferredText}>Preferred</Text> : <SmallAction label="Prefer" icon="star-outline" color={colors.success} onPress={() => onPreferred(file.assetId, source.sourceOccurrenceId)} />}</View>)) : members.map((file) => <Pressable key={file.assetId} onPress={() => onFile(file)}><FileRow file={file} onPress={() => onFile(file)} /></Pressable>)}</View>; })}</ScrollView>; }
-function SecondaryHeader({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) { return <View style={styles.secondaryHeader}><Pressable onPress={onBack} style={({ pressed }) => [styles.back, press(pressed)]}><Icon name="arrow-back" color={colors.cyan} /></Pressable><View style={styles.flex}><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View></View>; }
-function SmallAction({ label, icon, color, onPress }: { label: string; icon: keyof typeof MaterialIcons.glyphMap; color: string; onPress: () => void }) { return <Pressable onPress={onPress} style={({ pressed }) => [styles.smallAction, { borderColor: `${color}70`, backgroundColor: `${color}18` }, press(pressed)]}><Icon name={icon} color={color} size={14} /><Text style={[styles.smallActionText, { color }]}>{label}</Text></Pressable>; }
-
-function Sources({ sources, authenticating, onConnect }: { sources: Source[]; authenticating: boolean; onConnect: () => void }) { return <ScrollView contentContainerStyle={styles.scroll}><View style={styles.header}><View><Text style={styles.title}>Sources</Text><Text style={styles.subtitle}>Keep each Drive separate and read-only</Text></View><View style={styles.roundIcon}><Icon name="storage" color={colors.cyan} /></View></View><View style={styles.sourceExplainer}><Icon name="lock" color={colors.success} /><Text style={styles.sourceExplainerText}>You can link multiple Google Drives or shared drives. Each remains a separate, read-only source with independent provenance.</Text></View>{sources.map((source) => { const linked = source.status === "Connected read-only" || source.status === "Fixture catalogue"; return <View key={source.id} style={styles.sourceItem}><View style={styles.sourceGlyph}><Icon name="folder-shared" color={linked ? colors.cyan : colors.warning} /></View><View style={styles.flex}><Text style={styles.cardTitle}>{source.name}</Text><Text style={styles.cardSub}>{source.detail}</Text><View style={[styles.statusPill, { backgroundColor: linked ? "#50D4FF1E" : "#F6C75B1E" }]}><Text style={[styles.statusText, { color: linked ? colors.cyan : colors.warning }]}>{source.status}{source.itemCount ? ` · ${source.itemCount} items` : ""}</Text></View></View></View>; })}<Pressable onPress={onConnect} disabled={authenticating} style={({ pressed }) => [styles.addSource, authenticating && styles.disabled, press(pressed)]}><View style={styles.plus}>{authenticating ? <ActivityIndicator color={colors.bg} size="small" /> : <Icon name="add" color={colors.bg} />}</View><View style={styles.flex}><Text style={styles.addTitle}>Connect a Google Drive</Text><Text style={styles.cardSub}>Choose an account or shared Drive to view without editing.</Text></View><Icon name="chevron-right" color={colors.cyan} /></Pressable><View style={styles.oauthNote}><Text style={styles.oauthTitle}>Read-only viewing</Text><Text style={styles.cardSub}>PixelDrive can show your Drive images, videos, and files. It never uploads, moves, renames, deletes, or overwrites originals.</Text></View><Text style={styles.sectionTitle}>Background activity</Text>{INITIAL_JOBS.slice(0, 3).map((job) => <View key={job.id} style={styles.job}><View style={styles.rowBetween}><Text style={styles.jobName}>{job.displayName}</Text><Text style={[styles.jobStatus, { color: job.status === "COMPLETED" ? colors.success : colors.cyan }]}>{job.progressPercent}%</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${job.progressPercent}%`, backgroundColor: job.status === "COMPLETED" ? colors.success : colors.cyan }]} /></View></View>)}</ScrollView>; }
-
-function Nav({ current, onSelect }: { current: Tab; onSelect: (tab: Tab) => void }) { return <View style={styles.nav}>{tabs.map((tab) => <Pressable key={tab.label} onPress={() => onSelect(tab.label)} style={({ pressed }) => [styles.navItem, press(pressed)]}><Icon name={tab.icon} color={current === tab.label ? colors.cyan : colors.muted} size={22} /><Text style={[styles.navLabel, current === tab.label && styles.navActive]}>{tab.label}</Text></Pressable>)}</View>; }
-function Filter({ values, value, onChange }: { values: string[]; value: string; onChange: (value: string) => void }) { return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>{values.map((item) => <Pressable key={item} onPress={() => onChange(item)} style={({ pressed }) => [styles.filter, styles.filterFix, value === item && styles.filterActive, press(pressed)]}><Text style={[styles.filterText, styles.filterTextFix, value === item && styles.filterTextActive]} numberOfLines={1}>{item}</Text></Pressable>)}</ScrollView>; }
-function FileVisual({ file, size }: { file: FileRecord; size: number }) { return <View style={[styles.visual, { width: size, height: size, backgroundColor: file.previewColor }]}><Icon name={fileIcon(file)} color="#FFFFFF" size={Math.round(size * 0.32)} /></View>; }
-function FileRow({ file, onPress }: { file: FileRecord; onPress: () => void }) { return <Pressable onPress={onPress} style={({ pressed }) => [styles.fileRow, press(pressed)]}><FileVisual file={file} size={48} /><View style={styles.flex}><Text style={styles.fileName} numberOfLines={1}>{file.fileName}</Text><Text style={styles.fileMeta}>{file.category} · {formatBytes(file.sizeBytes)} · {file.dateTaken}</Text></View>{file.reviewState === "NEEDS_REVIEW" ? <Icon name="pending-actions" color={colors.warning} size={17} /> : <Icon name="chevron-right" color={colors.muted} size={18} />}</Pressable>; }
-function driveIcon(file: DriveFile): keyof typeof MaterialIcons.glyphMap { return file.mimeType.startsWith("image/") ? "image" : file.mimeType.startsWith("video/") ? "videocam" : file.mimeType.includes("pdf") ? "picture-as-pdf" : "description"; }
-function DriveFileRow({ file, previewUrl, onPress }: { file: DriveFile; previewUrl?: string; onPress: () => void }) { const visual = file.mimeType.startsWith("image/") ? <Image source={previewUrl} style={styles.driveRowImage} contentFit="cover" transition={160} /> : <View style={styles.driveRowIcon}><Icon name={driveIcon(file)} color={file.mimeType.startsWith("video/") ? colors.purple : colors.cyan} /></View>; return <Pressable onPress={onPress} style={({ pressed }) => [styles.fileRow, press(pressed)]}>{visual}<View style={styles.flex}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text><Text style={styles.fileMeta}>{file.sourceName} · {file.mimeType.startsWith("video/") ? "Video" : file.mimeType.startsWith("image/") ? "Image" : "File"}{file.size ? ` · ${formatBytes(Number(file.size))}` : ""}</Text></View><Icon name="chevron-right" color={colors.muted} size={18} /></Pressable>; }
-function Quick({ icon, label, detail, onPress }: { icon: keyof typeof MaterialIcons.glyphMap; label: string; detail: string; onPress: () => void }) { return <Pressable onPress={onPress} style={({ pressed }) => [styles.quick, press(pressed)]}><Icon name={icon} color={colors.cyan} size={19} /><Text style={styles.quickLabel}>{label}</Text><Text style={styles.quickDetail}>{detail}</Text></Pressable>; }
-function Empty({ title, text }: { title: string; text: string }) { return <View style={styles.empty}><Icon name="search-off" color={colors.muted} size={28} /><Text style={styles.emptyTitle}>{title}</Text><Text style={styles.emptyText}>{text}</Text></View>; }
-function Detail({ file, onClose }: { file: FileRecord | null; onClose: () => void }) { if (!file) return null; return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.scrim}><View style={styles.detailSheet}><View style={styles.handle} /><FileVisual file={file} size={92} /><Text style={styles.detailTitle}>{file.fileName}</Text><Text style={styles.subtitle}>{file.mimeType} · {formatBytes(file.sizeBytes)}</Text><View style={styles.detailBlock}><Text style={styles.detailLabel}>Stored observation</Text><Text style={styles.detailText}>{file.visualDescription || file.ocrText || "No stored description yet."}</Text></View><View style={styles.detailBlock}><Text style={styles.detailLabel}>Read-only source locations</Text>{file.sources.map((source) => <Text key={source.sourceOccurrenceId} style={styles.detailText}>{source.originalPath}</Text>)}</View><Pressable onPress={onClose} style={({ pressed }) => [styles.close, press(pressed)]}><Text style={styles.closeText}>Close</Text></Pressable></View></View></Modal>; }
-function DriveVideo({ url }: { url: string }) { const player = useVideoPlayer(url); return <VideoView style={styles.driveVideo} player={player} nativeControls allowsFullscreen contentFit="contain" surfaceType="textureView" />; }
-function DriveDetail({ file, mediaUrl, onClose }: { file: DriveFile | null; mediaUrl: (file: DriveFile) => string; onClose: () => void }) { if (!file) return null; const url = mediaUrl(file); const isImage = file.mimeType.startsWith("image/"); const isVideo = file.mimeType.startsWith("video/"); return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.scrim}><View style={styles.detailSheet}><View style={styles.handle} />{isImage ? <Image source={url} style={styles.detailImage} contentFit="contain" transition={180} /> : isVideo ? <DriveVideo url={url} /> : <View style={styles.detailFileIcon}><Icon name={driveIcon(file)} color={colors.cyan} size={40} /></View>}<Text style={styles.detailTitle}>{file.name}</Text><Text style={styles.subtitle}>{file.sourceName} · {file.mimeType}{file.size ? ` · ${formatBytes(Number(file.size))}` : ""}</Text>{file.description ? <View style={styles.detailBlock}><Text style={styles.detailLabel}>Google Drive description</Text><Text style={styles.detailText}>{file.description}</Text></View> : null}<View style={styles.detailBlock}><Text style={styles.detailLabel}>Viewing boundary</Text><Text style={styles.detailText}>This is a read-only view. PixelDrive does not provide upload, download, rename, move, or delete actions.</Text></View>{file.webViewLink ? <Pressable onPress={() => Linking.openURL(file.webViewLink!)} style={({ pressed }) => [styles.viewOriginal, press(pressed)]}><Icon name="open-in-new" color={colors.bg} size={17} /><Text style={styles.viewOriginalText}>View in Google Drive</Text></Pressable> : null}<Pressable onPress={onClose} style={({ pressed }) => [styles.close, press(pressed)]}><Text style={styles.closeText}>Close</Text></Pressable></View></View></Modal>; }
-
-const styles = StyleSheet.create({
-  driveScroll: { gap: 10, paddingBottom: 24 },
-  mediaSection: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.4, marginTop: 3, textTransform: "uppercase" },
-  remoteTile: { flexBasis: "48%" },
-  remoteImage: { width: "100%", height: 150, borderRadius: 9, backgroundColor: colors.card },
-  driveRowImage: { width: 48, height: 48, borderRadius: 10, backgroundColor: colors.card },
-  driveRowIcon: { width: 48, height: 48, borderRadius: 10, backgroundColor: colors.card, justifyContent: "center", alignItems: "center" },
-  detailImage: { width: "100%", height: 250, borderRadius: 13, backgroundColor: colors.card },
-  driveVideo: { width: "100%", height: 220, borderRadius: 13, backgroundColor: "#000000" },
-  detailFileIcon: { width: 92, height: 92, borderRadius: 18, backgroundColor: colors.card, alignSelf: "center", justifyContent: "center", alignItems: "center" },
-  viewOriginal: { minHeight: 45, borderRadius: 10, backgroundColor: colors.cyan, justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 7 },
-  viewOriginalText: { color: colors.bg, fontSize: 12, fontWeight: "900" },
-  filterFix: { minHeight: 38, justifyContent: "center", paddingVertical: 0 },
-  filterTextFix: { lineHeight: 17, includeFontPadding: false, textAlignVertical: "center" },
-  secondaryLinks: { flexDirection: "row", gap: 8, marginTop: 15 },
-  secondaryLink: { flex: 1, minHeight: 42, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 8 },
-  secondaryLinkText: { color: colors.text, fontSize: 10, fontWeight: "800", flex: 1 },
-  secondaryHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 15 },
-  back: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  reviewItem: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 10, gap: 9 },
-  reviewEvidence: { color: colors.warning, fontSize: 10, lineHeight: 15 },
-  reviewActions: { flexDirection: "row", gap: 7 },
-  smallAction: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 6 },
-  smallActionText: { fontSize: 10, fontWeight: "800" },
-  duplicateGroup: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 11, gap: 9 },
-  duplicateType: { color: colors.purple, fontSize: 10, fontWeight: "900" },
-  duplicateMember: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: colors.card, borderRadius: 9, padding: 7 },
-  preferred: { flexDirection: "row", alignItems: "center", gap: 3 },
-  preferredText: { color: colors.success, fontSize: 9, fontWeight: "800" },
-  safe: { flex: 1, backgroundColor: colors.bg }, root: { flex: 1, backgroundColor: colors.bg }, content: { flex: 1 }, center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 }, screen: { flex: 1, paddingHorizontal: 18, paddingTop: 16 }, scroll: { padding: 18, gap: 16, paddingBottom: 28 }, flex: { flex: 1 }, row: { flexDirection: "row", alignItems: "center", gap: 10 }, rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }, pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] }, homeHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, brand: { color: colors.text, fontSize: 25, fontWeight: "800", letterSpacing: -0.6 }, title: { color: colors.text, fontSize: 22, fontWeight: "800", letterSpacing: -0.45 }, subtitle: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3 }, sourceChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#50D4FF17", borderWidth: 1, borderColor: "#50D4FF4A", borderRadius: 18, paddingHorizontal: 9, paddingVertical: 7 }, sourceChipText: { color: colors.cyan, fontSize: 10, fontWeight: "800" }, searchCall: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 13, padding: 14 }, searchCallText: { color: colors.muted, fontSize: 13, flex: 1 }, sourceCard: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 13, gap: 10 }, sourceIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#56D49A17" }, cardTitle: { color: colors.text, fontSize: 13, fontWeight: "800" }, cardSub: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 }, textAction: { alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 2 }, textActionLabel: { color: colors.cyan, fontSize: 11, fontWeight: "800" }, reviewCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#F6C75B15", borderColor: "#F6C75B75", borderWidth: 1, borderRadius: 12, padding: 12 }, reviewTitle: { color: colors.warning, fontSize: 13, fontWeight: "800" }, sectionHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 3 }, sectionTitle: { color: colors.text, fontSize: 16, fontWeight: "800" }, seeAll: { color: colors.cyan, fontSize: 11, fontWeight: "800" }, imageRow: { gap: 10, paddingRight: 18 }, recentCard: { width: 112 }, visual: { borderRadius: 12, alignItems: "center", justifyContent: "center" }, recentTitle: { color: colors.text, fontSize: 10, fontWeight: "800", marginTop: 6 }, recentMeta: { color: colors.muted, fontSize: 9, marginTop: 2 }, quickRow: { flexDirection: "row", gap: 8 }, quick: { flex: 1, minHeight: 86, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 10, justifyContent: "space-between" }, quickLabel: { color: colors.text, fontSize: 11, fontWeight: "800", marginTop: 6 }, quickDetail: { color: colors.muted, fontSize: 9, marginTop: 2 }, footnote: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 2 }, header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, roundIcon: { height: 38, width: 38, borderRadius: 19, backgroundColor: "#50D4FF17", alignItems: "center", justifyContent: "center" }, filters: { gap: 7, paddingVertical: 15, paddingRight: 18 }, filter: { borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7 }, filterActive: { backgroundColor: colors.primary, borderColor: colors.primary }, filterText: { color: colors.muted, fontSize: 11, fontWeight: "800" }, filterTextActive: { color: "#FFFFFF" }, grid: { gap: 10, paddingBottom: 18 }, gridRow: { gap: 10 }, imageTile: { flex: 1, maxWidth: "49%", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, padding: 6, borderRadius: 13, overflow: "hidden", marginBottom: 10 }, imageOverlay: { paddingTop: 7 }, imageName: { color: colors.text, fontSize: 10, fontWeight: "800" }, imageMeta: { color: colors.muted, fontSize: 9, marginTop: 2 }, segment: { flexDirection: "row", backgroundColor: colors.surface, borderRadius: 10, padding: 3, marginTop: 16 }, segmentItem: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: "center" }, segmentActive: { backgroundColor: colors.card }, segmentText: { color: colors.muted, fontSize: 11, fontWeight: "800" }, segmentTextActive: { color: colors.cyan }, input: { flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 11, marginTop: 14 }, inputText: { flex: 1, paddingVertical: 12, color: colors.text, fontSize: 13 }, searchStart: { paddingTop: 38, gap: 10 }, empty: { paddingTop: 76, alignItems: "center", gap: 8 }, emptyTitle: { color: colors.text, fontSize: 15, fontWeight: "800", textAlign: "center" }, emptyText: { color: colors.muted, fontSize: 12, lineHeight: 17, textAlign: "center", maxWidth: 270 }, example: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, borderRadius: 10, padding: 11, marginTop: 3 }, exampleText: { color: colors.text, fontSize: 11, fontWeight: "700" }, list: { gap: 9, paddingBottom: 18, paddingTop: 3 }, fileRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 9 }, fileName: { color: colors.text, fontSize: 12, fontWeight: "800" }, fileMeta: { color: colors.muted, fontSize: 10, marginTop: 4 }, askWrap: { flex: 1, marginTop: 13 }, askIntro: { alignItems: "center", paddingTop: 48, gap: 10 }, chat: { gap: 9, paddingBottom: 10 }, bubble: { padding: 11, borderRadius: 12, maxWidth: "94%" }, userBubble: { backgroundColor: "#1E579C", alignSelf: "flex-end" }, assistantBubble: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, alignSelf: "flex-start" }, bubbleRole: { color: colors.cyan, fontSize: 9, fontWeight: "900", marginBottom: 4 }, bubbleText: { color: colors.text, fontSize: 12, lineHeight: 17 }, citation: { flexDirection: "row", alignItems: "center", gap: 4, borderColor: "#50D4FF52", borderWidth: 1, borderRadius: 6, padding: 5, marginTop: 8, alignSelf: "flex-start" }, citationText: { color: colors.cyan, fontSize: 10, fontWeight: "700" }, composer: { flexDirection: "row", alignItems: "flex-end", gap: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 13, padding: 6, marginBottom: 10 }, composerText: { color: colors.text, fontSize: 12, flex: 1, paddingHorizontal: 7, paddingVertical: 7, maxHeight: 80 }, send: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.cyan, alignItems: "center", justifyContent: "center" }, disabled: { opacity: 0.35 }, sourceExplainer: { flexDirection: "row", gap: 9, backgroundColor: "#56D49A15", borderWidth: 1, borderColor: "#56D49A52", borderRadius: 12, padding: 12, marginTop: 16 }, sourceExplainerText: { color: colors.success, fontSize: 11, lineHeight: 16, flex: 1 }, sourceItem: { flexDirection: "row", gap: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 13, padding: 11 }, sourceGlyph: { height: 36, width: 36, borderRadius: 10, backgroundColor: colors.card, justifyContent: "center", alignItems: "center" }, statusPill: { alignSelf: "flex-start", borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4, marginTop: 7 }, statusText: { fontSize: 9, fontWeight: "800" }, addSource: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderStyle: "dashed", borderColor: "#50D4FF80", borderRadius: 13, padding: 12 }, plus: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.cyan, alignItems: "center", justifyContent: "center" }, addTitle: { color: colors.cyan, fontSize: 12, fontWeight: "800" }, oauthNote: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12 }, oauthTitle: { color: colors.text, fontSize: 12, fontWeight: "800" }, job: { backgroundColor: colors.surface, borderRadius: 11, padding: 11, gap: 7 }, jobName: { color: colors.text, fontSize: 11, fontWeight: "700" }, jobStatus: { fontSize: 10, fontWeight: "900" }, track: { height: 4, backgroundColor: colors.border, borderRadius: 3, overflow: "hidden" }, fill: { height: "100%", borderRadius: 3 }, nav: { flexDirection: "row", minHeight: 63, backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1, paddingTop: 7, paddingBottom: Platform.OS === "web" ? 9 : 5 }, navItem: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 }, navLabel: { color: colors.muted, fontSize: 9, fontWeight: "700" }, navActive: { color: colors.cyan }, scrim: { flex: 1, backgroundColor: "#000000B8", justifyContent: "flex-end" }, sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 14 }, detailSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 13, alignItems: "stretch" }, handle: { height: 4, width: 40, borderRadius: 4, alignSelf: "center", backgroundColor: colors.border, marginBottom: 2 }, sheetInput: { color: colors.text, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.card, padding: 12, fontSize: 13 }, sheetActions: { flexDirection: "row", justifyContent: "flex-end", gap: 9 }, cancel: { paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 9 }, cancelText: { color: colors.text, fontSize: 12, fontWeight: "800" }, primary: { paddingHorizontal: 14, paddingVertical: 10, backgroundColor: colors.primary, borderRadius: 9 }, primaryText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" }, detailTitle: { color: colors.text, fontSize: 17, fontWeight: "800" }, detailBlock: { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 11, padding: 11 }, detailLabel: { color: colors.cyan, fontSize: 10, fontWeight: "900", marginBottom: 5 }, detailText: { color: colors.text, fontSize: 11, lineHeight: 16 }, close: { minHeight: 45, borderRadius: 10, backgroundColor: colors.card, justifyContent: "center", alignItems: "center" }, closeText: { color: colors.text, fontSize: 12, fontWeight: "800" }, muted: { color: colors.muted, fontSize: 12 },
-});

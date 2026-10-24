@@ -1,5 +1,11 @@
 # Gallery in Android Studio
 
+> This document records the earlier 1.0.0 setup and checks. For the prepared
+> Drive 1.1.0 project, current paths, local indexing behavior, and verified
+> limits, use [IDE-HANDOFF.md](IDE-HANDOFF.md). The 1.1.0 release workflow uses
+> `android/build-client.sh` with Limrun; generating an Android Studio project
+> does not constitute a new native build.
+
 Gallery is an Expo SDK 54 / React Native 0.81.5 application with a separate
 Node API. Android Studio builds the native client; it does not run the API,
 MySQL, Analysis, Search, or Ollama.

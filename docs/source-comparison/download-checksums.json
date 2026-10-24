@@ -1,0 +1,22 @@
+[
+  {
+    "file": "Gallery-Gemini-Handoff.md",
+    "bytes": 6644,
+    "sha256": "ef90901b233fd80c0e6a86831c04eec131e4d2bdd70b4153dc73b03aa62781e2"
+  },
+  {
+    "file": "Gallery-deployment.zip",
+    "bytes": 8748,
+    "sha256": "d1b4fc7c2251f0416dceb0de95dd8efd6eae121612cb3284abedc29171627f3b"
+  },
+  {
+    "file": "Gallery-main.zip",
+    "bytes": 1427223,
+    "sha256": "bdb9205b676b5bc5bc7c567e68ef68c0dd8b36f074b5f1b9eb08de101791ecae"
+  },
+  {
+    "file": "gallery-phone-test.apk",
+    "bytes": 93138866,
+    "sha256": "f2ab9fb9acf0505960c877e13585d8e80e60676ef1963bcc5f50e95765185472"
+  }
+]

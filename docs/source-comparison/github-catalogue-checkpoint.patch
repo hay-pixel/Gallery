@@ -1,0 +1,947 @@
+diff --git a/.github/copilot-instructions.md b/.github/copilot-instructions.md
+new file mode 100644
+index 0000000..a39ec46
+--- /dev/null
++++ b/.github/copilot-instructions.md
+@@ -0,0 +1,19 @@
++# Gallery builder instructions
++
++Read and follow `AGENTS.md`, `README.md`, and the relevant `docs/contracts/`. The root README
++contains current status and next backend integration tasks. `apps/gallery/todo.md` separates
++historical completed UI work from current standalone integration work.
++
++Preserve existing tested behavior, canonical SHA-256 asset identity, all source occurrences,
++owner isolation, and review overrides. Sample UI records are evaluation data, not live imports.
++`services/catalogue` currently exposes a trusted operator CLI, not an authenticated HTTP API.
++
++The user reports an AWS Ubuntu backend host; inspect actual routes/authentication before
++integrating it. Follow `deploy/aws/README.md`. Do not invent endpoints or claim a configured
++API base URL completes the integration. Keep private workers/Ollama and credentials server-side.
++Do not deploy, provision resources, merge, or expose services without user authorization.
++
++Use `bash scripts/codex/environment.sh setup`, `test`, and `build` from the repository root.
++New catalogue changes must also pass `ruff check services/catalogue` and
++`mypy --strict services/catalogue/src` in the prepared Python environment. Record test
++results and explicitly distinguish fixture, live-runtime, and native-device evidence.
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 2c899e1..4ba3150 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -30,5 +30,7 @@ jobs:
+       - uses: actions/setup-python@v5
+         with:
+           python-version: '3.12'
+-      - run: python -m pip install -e 'services/analysis[test]' -e 'services/search[test]'
+-      - run: pytest services/analysis/tests services/search/tests tests/integration
++      - run: python -m pip install -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/catalogue[test]'
++      - run: pytest services/analysis/tests services/search/tests services/catalogue/tests tests/integration
++      - run: ruff check services/catalogue
++      - run: mypy --strict services/catalogue/src
+diff --git a/AGENTS.md b/AGENTS.md
+index d05fe98..09c95a8 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -2,6 +2,8 @@
+ 
+ Read README.md, docs/MIGRATION.md, relevant subsystem contracts, and deploy/aws/README.md before implementation. README.md describes current implementation and remaining milestones; do not claim planned features exist.
+ 
++The user reports an existing AWS Ubuntu backend host; its endpoints and compatibility are not verified here. Inspect that host before choosing adapters or deployment changes. The catalogue CLI exists, but authenticated catalogue/media HTTP routes and real-library UI integration remain unfinished. Follow the root README continuation sequence.
++
+ Own independent source connectors, catalogue, Analysis, Search, and private Ollama. Extract export is one optional source. Preserve canonical identity, source occurrences, user overrides, and degraded behavior.
+ 
+ This standalone repository supersedes the historical monorepo planning pause for its assigned product. Old handoffs are evidence, not active assignments. Preserve tested behavior. Keep all credentials/runtime state outside Git. Use independent CI and record test evidence and remaining limitations.
+diff --git a/README.md b/README.md
+index 3c7669e..ebbb270 100644
+--- a/README.md
++++ b/README.md
+@@ -4,11 +4,44 @@ Standalone universal file library: authorized sources, unified catalogue, browse
+ 
+ ## Current status
+ 
+-The Expo/React Native + Node app, read-only Google Drive OAuth, image-v1 Analysis, visual Search, and Analysis→Search bridge are migrated. Full metadata/semantic/hybrid Search, real catalogue integration, and the Ollama adapter remain unfinished. `services/ollama` currently holds documentation, not a completed runtime.
++The Expo/React Native + Node app, read-only Google Drive OAuth, image-v1 Analysis, visual Search, and Analysis→Search bridge are migrated. A Gallery-owned local collection importer now provides durable canonical bytes and owner-scoped catalogue listing (see `services/catalogue/README.md`). Full metadata/semantic/hybrid Search, app catalogue integration, and the Ollama adapter remain unfinished. `services/ollama` currently holds documentation, not a completed runtime.
++
++## Continue development in VS Code or another builder
++
++This is a development checkpoint, not a finished backend or deployed release. The next
++builder should run `bash scripts/codex/environment.sh setup`, then the `test` and `build`
++actions described in [the environment guide](docs/CODEX-ENVIRONMENT.md). Read `AGENTS.md`,
++this milestone list, and the relevant `docs/contracts/` before changing interfaces.
++The [catalogue README](services/catalogue/README.md) documents the implemented local
++operator boundary; [checkpoint evidence](docs/progress/2026-10-09-gallery-start.md) records
++what was verified. `.github/copilot-instructions.md` points Copilot to the same requirements.
++
++The user reports an existing AWS Ubuntu backend host. Its endpoints, running services, API
++compatibility, authentication, and storage have not been inspected from this workspace.
++Integrate with that host after inspecting its actual API; do not assume this checkout has
++already supplied or connected a complete backend. See [the AWS integration checklist](deploy/aws/README.md).
++
++Next work, in order:
++
++1. Inspect the existing backend's catalogue, media, session, Search, and Analysis interfaces.
++   Map implemented routes to the accepted contracts; explicitly list missing routes.
++2. Implement authenticated catalogue listing and authorized media delivery. Derive owner
++   scope from server-verified sessions. Keep storage paths and service credentials server-side.
++3. Add a client catalogue adapter and explicit real-library mode. Keep sample/evaluation
++   records separate, preserve review overrides keyed by canonical asset ID, and represent
++   pending/unavailable capabilities truthfully. Do not show fixtures as a successful live import.
++4. Wire the configured backend origin, test pagination/ownership/errors, then verify OAuth,
++   imported media, restart persistence, and native flows against the Ubuntu host.
++
++The current client uses tRPC v11 at `<API-origin>/api/trpc`, SuperJSON, and signed Gallery
++bearer sessions. `EXPO_PUBLIC_API_BASE_URL` selects the public backend origin; changing it
++alone does not implement missing catalogue endpoints or make an unrelated API compatible.
++Basic catalogue browsing must work when Analysis, Search indexes, or Ollama is unavailable.
+ 
+ ## Layout
+ 
+ - `apps/gallery/`: frontend, Node backend, OAuth, MySQL migrations, app tests.
++- `services/catalogue/`: local directory import, checksum identity, owned blobs, SQLite provenance, operator CLI.
+ - `services/analysis/`: Python classification, optional OCR, immutable results/features.
+ - `services/search/`: Python/SQLite/NumPy visual retrieval.
+ - `services/ollama/`: planned project-owned adapter/tools.
+@@ -60,15 +93,15 @@ Python 3.12, from repository root:
+ ```bash
+ python3.12 -m venv .venv
+ . .venv/bin/activate
+-python -m pip install -e 'services/analysis[test]' -e 'services/search[test]'
+-pytest services/analysis/tests services/search/tests tests/integration
++python -m pip install -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/catalogue[test]'
++pytest services/analysis/tests services/search/tests services/catalogue/tests tests/integration
+ ```
+ 
+ Tests use fixture backends. Real model verification needs dependencies/cache in `services/analysis/README.md`. Baseline ResNet-18 provides classifier tags and embeddings, not general object detection/captioning. OCR is optional and requires Tesseract.
+ 
+ ## Implementation milestones
+ 
+-1. **Real catalogue:** source adapters, local collection import, Drive ingestion, ownership, checksums, pagination/media access, durable identity and provenance.
++1. **Real catalogue (first slice implemented):** local directory import and durable owner-scoped listing exist; remaining: authenticated app/API and media integration, Drive ingestion, collection-manifest imports, source management, and production durability/ownership acceptance.
+ 2. **Complete Search:** metadata filtering/pagination, semantic embedding lifecycle, hybrid ranking with component provenance, stable API, and missing/stale/incompatible states.
+ 3. **Analysis integration:** durable jobs/retries, model revisions, immutable result history, preferred results, tags/OCR/features, truthful availability.
+ 4. **Ollama:** health/capabilities, model selection, query interpretation, bounded retrieval tools, streaming grounded answers, real asset citations and exact provenance.
+@@ -84,7 +117,7 @@ Extract owns the asset schema; `contracts/` pins the migrated v1 snapshot and ex
+ 
+ ## AWS plan
+ 
+-Profile `ollamabinsaden`; selected Region `ap-southeast-2`. Initial candidate: EC2/Linux for Analysis/Search/Ollama, EBS for durable model/index state, separately served app/API. Evaluate S3 media and managed MySQL after cost/workload review. Confirm project service eligibility and CPU/RAM/GPU needs before provisioning. Use service roles and CI OIDC. No infrastructure was deployed by this split.
++Profile `ollamabinsaden`; selected Region `ap-southeast-2`. Initial candidate: EC2/Linux for Analysis/Search/Ollama, EBS for durable model/index state, separately served app/API. Evaluate S3 media and managed MySQL after cost/workload review. Confirm project service eligibility and CPU/RAM/GPU needs before provisioning. Use service roles and CI OIDC. No infrastructure was deployed by this split. The user subsequently reported an existing AWS Ubuntu backend host; its deployment and compatibility remain unverified here.
+ 
+ Independent repositories/releases can initially share a host, with separate identities, configuration, and storage. Assist remains optional.
+ 
+diff --git a/apps/gallery/README.md b/apps/gallery/README.md
+index 68d5313..2241c05 100644
+--- a/apps/gallery/README.md
++++ b/apps/gallery/README.md
+@@ -21,3 +21,15 @@ Set `DATABASE_URL`, `GALLERY_WEB_RETURN_ORIGINS` (comma-separated exact Gallery
+ Analysis and Search are optional capabilities with explicit availability states. Deterministic catalogue browsing/search works while Analysis, Search similarity, or Ollama is unavailable. Current sample data is an adapter/evaluation catalogue; wiring the filesystem ingest record reader and permanent Search/Analysis HTTP contracts remains integration work.
+ 
+ Production uses `dist/index.mjs` and binds exactly `PORT`. Anonymous signed Gallery sessions provide device-local Drive ownership; cross-device account recovery is not implemented yet.
++
++## Backend integration status
++
++The repository now includes `services/catalogue` for local collection ingestion and durable
++owner-scoped listing. It is an operator CLI, not an HTTP endpoint, and this app still uses
++its evaluation catalogue. Follow the root README's next-work sequence to add an authenticated
++catalogue/media boundary and client adapter before treating live library integration as done.
++
++The user reports an AWS Ubuntu backend host, but no host routes have been inspected here.
++The existing tRPC client requires compatible routes, SuperJSON, and signed bearer sessions;
++setting `EXPO_PUBLIC_API_BASE_URL` only selects the origin. Use `deploy/aws/README.md` for the
++host integration checklist and `.env.example` for the existing configuration names.
+diff --git a/apps/gallery/todo.md b/apps/gallery/todo.md
+index a418c16..36c4691 100644
+--- a/apps/gallery/todo.md
++++ b/apps/gallery/todo.md
+@@ -23,5 +23,16 @@
+ - [x] Remove the broken template login dependency from Drive connection and launch Google OAuth directly.
+ - [x] Support multiple simultaneous linked Google Drive sources without source replacement.
+ - [x] Index and render linked Drive images, videos, and ordinary files as read-only previews.
+-- [ ] Integrate the Gallery with the approved private Ollama and Search service boundaries only after Gate 5 exposes a stable executable Search API and the architect assigns the Gallery integration gate.
++- [ ] Integrate the Gallery with the accepted private Ollama and Search contracts after implementing/verifying executable APIs. Historical monorepo Gate 5/architect assignment requirements are superseded by the standalone root README and AGENTS.md.
+ - [x] Synchronize the selected Pixeldrive GitHub repository with the completed mobile source and reviewer-ready documentation.
++
++## Standalone backend integration (current work)
++
++- [x] Add Gallery-owned local collection ingestion, SHA-256 canonical identity, source occurrences, and persistent owner-scoped CLI listing.
++- [x] Add catalogue schema/provenance/restart/failure tests and fixture Analysis/Search interoperability; wire setup and CI.
++- [ ] Inspect the user-reported AWS Ubuntu backend and map its actual routes/authentication to the accepted contracts.
++- [ ] Implement authenticated catalogue pagination and authorized media delivery.
++- [ ] Wire a real-library client adapter; preserve canonical-ID review overrides and explicit unavailable states.
++- [ ] Validate real Drive ingestion, deployed OAuth returns, durable restart, and native/device behavior.
++
++The current app evaluation catalogue is not proof of live backend integration. See the root README for current priorities.
+diff --git a/deploy/aws/README.md b/deploy/aws/README.md
+index a664b66..ebb2bec 100644
+--- a/deploy/aws/README.md
++++ b/deploy/aws/README.md
+@@ -1,6 +1,6 @@
+ # AWS deployment implementation plan
+ 
+-No application infrastructure has been provisioned. Selected Region: `ap-southeast-2`; developer profile: `ollamabinsaden`.
++No application infrastructure was provisioned by the repository migration or this checkpoint. The user reports an existing AWS Ubuntu backend host; this workspace has not inspected or deployed to it. Selected Region: `ap-southeast-2`; developer profile: `ollamabinsaden`.
+ 
+ 1. Verify project paid/free plan, supported services, spend limit, and workload sizing.
+ 2. Describe infrastructure as code; select an EC2/Linux baseline where persistent local workers, SQLite, model caches, or tmux require it.
+@@ -10,3 +10,34 @@ No application infrastructure has been provisioned. Selected Region: `ap-southea
+ 6. Deploy reviewed artifacts and verify product-specific real-data/live-agent acceptance before marking a release complete.
+ 
+ See the root README for product-specific scope, proposed resources, and acceptance milestones. Historical Azure addresses, paths, and host assumptions are not the current target.
++
++## Connect the existing Ubuntu backend
++
++Inspect and reuse the existing host before proposing infrastructure changes. Required inputs
++are its reachable API origin, API description/routes, session/authentication mechanism,
++service versions, durable storage paths, and access through an authorized executor. No
++endpoint, host access, or credentials are configured in this workspace. Do not put them in Git.
++
++- Existing Gallery Node routes are `/api/health`, `/api/trpc`, and the Google Drive routes;
++  the catalogue CLI is not an HTTP server. Confirm whether the host runs this Node API,
++  exposes another API requiring a server-side adapter, or still needs these routes implemented.
++- Configure the client's `EXPO_PUBLIC_API_BASE_URL` to the reachable API origin when the
++  compatible routes exist. Expo public variables are bundled at build/start time; rebuild or
++  restart the client after changing them. On devices, localhost addresses the device itself.
++- Inject server secrets outside Git. Keep the existing JWT_SECRET stable where saved Drive
++  tokens depend on it. MySQL remains the current Drive credential store; SQLite catalogue
++  metadata and owned blobs are a separate Gallery state boundary.
++- Set exact allowed Gallery web origins in `GALLERY_WEB_RETURN_ORIGINS`; use the approved
++  HTTPS API callback `/api/google-drive/callback` and the Gallery web `/oauth/drive` return.
++  Confirm reverse-proxy URL handling, browser CORS, consent, and device deep-link returns.
++- Run catalogue import under a trusted service/operator identity against authorized source
++  mounts and durable storage. A client must never select arbitrary owner IDs or host paths.
++  Back up catalogue.sqlite and blobs together; preserve source occurrence history and annotations.
++- Keep Python workers and Ollama private. Gallery's authenticated backend mediates client
++  access; do not expose raw Ollama port 11434 or put model/service credentials in Expo variables.
++- Verify unauthorized access rejection, owner isolation, pagination, media bytes, degraded
++  browsing, restart persistence, and model provenance using real host data. Local fixture
++  tests and a successful build cannot establish those deployed behaviors.
++
++Connecting or deploying to the VM is a subsequent task requiring its actual access and
++configuration. This checkpoint authorizes no new resources or deployment.
+diff --git a/docs/CODEX-ENVIRONMENT.md b/docs/CODEX-ENVIRONMENT.md
+index da6ef9a..f54a009 100644
+--- a/docs/CODEX-ENVIRONMENT.md
++++ b/docs/CODEX-ENVIRONMENT.md
+@@ -4,7 +4,7 @@ These instructions configure the screen under Codex Settings → Worktrees → L
+ 
+ ## Prerequisites
+ 
+-Bash, uv, Node 22+, and Corepack or pnpm 9.12.0. Python tests use fixture backends; setup does not download Torch models, install Ollama, or create MySQL.
++Bash, uv, Node 22+, and Corepack or pnpm 9.12.0. Python tests include real local catalogue import and fixture Analysis/Search backends; setup does not download Torch models, install Ollama, or create MySQL.
+ 
+ The scripts support Linux/macOS Unix environments. They are not native PowerShell scripts. On Windows, use a WSL2 project/terminal; do not paste Bash into the Windows PowerShell override. Windows-native Extract/Gallery setup can instead use the individual commands in the root README, but that path has not been verified here.
+ 
+diff --git a/docs/progress/2026-10-09-gallery-start.md b/docs/progress/2026-10-09-gallery-start.md
+new file mode 100644
+index 0000000..8c25928
+--- /dev/null
++++ b/docs/progress/2026-10-09-gallery-start.md
+@@ -0,0 +1,73 @@
++# Gallery start checkpoint — 2026-10-09
++
++## Inspected baseline
++
++Clean checkout at f513a5a. Read AGENTS.md, root/app READMEs, migration and environment
++instructions, AWS plan, app TODO, pinned asset/occurrence schemas, Search and Analysis
++contracts, recent changes, CI, source code, and tests. Historical integration gates do
++not supersede the standalone repository requirements.
++
++Existing Expo UI uses an evaluation catalogue; Drive browsing has signed session ownership
++and encrypted credentials. Analysis and visual Search have fixture-backed tests. Real app
++catalogue integration, full Search, and Ollama runtime remain unfinished. No dependencies,
++credentials, database, or model runtime were prepared in this execution workspace.
++
++After the documented setup: 73 Python tests and 22 app tests passed; TypeScript passed;
++ESLint had zero errors and five inherited warnings; Node server build passed.
++
++## Implemented milestone slice
++
++Added services/catalogue: trusted local directory import, copied content-addressed blobs,
++SQLite canonical records/source occurrences, owner-scoped paginated listing, and an operator
++CLI. Exact byte duplicates share identity without losing occurrences. Re-imports preserve
++first observations; changed source bytes preserve historical assets. Imports skip symlinks
++and special files and roll back metadata on failure. Source IDs cannot silently change roots.
++No original source data, UI fixture state, annotations, shared schema, or sibling app changed.
++
++Setup and independent CI now install/test the catalogue; CI also checks its lint and typing.
++The service README documents operator usage, security boundary, storage semantics, and limits.
++
++## Evidence
++
++- Combined Python suite: 83 passed (73 existing + 9 catalogue + 1 new integration).
++- New service: Ruff passed, strict mypy passed, both pinned JSON Schemas validated.
++- CLI subprocess tests prove import then listing in a separate process and canonical byte access.
++- Real imported images feed existing Analysis and visual Search contracts after source deletion;
++  inference uses a deterministic fixture backend, not a real trained model.
++- Production Node server started locally; /api/health and /api/trpc/health both returned ok=true.
++  Temporary process was stopped. This proves API health only, not OAuth or frontend behavior.
++- Shell syntax and git diff whitespace checks passed.
++
++## Execution assessment and handoff
++
++Cloud is sufficient for implementation, dependency setup, local collection persistence/restart
++tests, fixture model integration, and the API smoke check. No Remote executor is attached;
++there is no need to switch for this slice. Runtime status reports no secrets or outbound
++identities. HTTP policy is restricted (subsequently observed enforced); no assumption of provider
++access is made.
++
++Remaining exact dependencies:
++
++- Real collection acceptance: provide an authorized readable collection mount and durable,
++  access-controlled state directory. Current tests use temporary data. A persistent host must
++  retain catalogue.sqlite and blobs together, provide disk capacity/backups, and survive restart.
++- Live Drive: configure MySQL DATABASE_URL, JWT_SECRET, dedicated Google Web OAuth client ID
++  and secret, reviewed database migrations, approved Gallery return origins, registered exact
++  API callback URI, and a consent-capable browser/test user. None are configured here.
++- Real inference: install Torch/torchvision and approved cached weights; optional OCR needs
++  Tesseract. Ollama adapter remains unimplemented and a private runtime/model selection is pending.
++  Persistent CPU/RAM/GPU sizing and model/index storage need workload evidence before provisioning.
++- Mobile acceptance: no Android/iOS simulator or device was used. A suitable Remote/native host
++  or physical device must verify secure storage, OAuth return links, media, and user interactions.
++  Native release builds and Expo web UI behavior were not verified by these checks.
++
++Next implementation: authenticated paginated catalogue/media backend operations, then an
++explicit real-library UI mode preserving existing review overrides and degraded browsing.
++The CLI owner selector is not authentication and must not be exposed directly over HTTP.
++
++The user subsequently authorized preserving and pushing this development checkpoint for other
++builders. Root/app READMEs, the active TODO, agent instructions, Copilot instructions, and AWS
++guidance now reflect the user-reported AWS Ubuntu backend host and the missing integration
++boundary. Host deployment, endpoints, and compatibility have not been verified. The checkpoint
++will be committed on `gallery/catalogue-checkpoint`; pushing source is not app deployment.
++No cloud resources were provisioned and no application deployment or merge was performed.
+diff --git a/scripts/codex/environment.sh b/scripts/codex/environment.sh
+index aee3b5d..67f6757 100644
+--- a/scripts/codex/environment.sh
++++ b/scripts/codex/environment.sh
+@@ -35,7 +35,7 @@ case "${1:-setup}" in
+   setup)
+     require_node
+     prepare_python
+-    uv pip install --python .venv/bin/python -e 'services/analysis[test]' -e 'services/search[test]'
++    uv pip install --python .venv/bin/python -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/catalogue[test]'
+     cd apps/gallery
+     if [[ "$(pnpm_run --version)" != "9.12.0" ]]; then
+       printf 'Gallery requires pnpm 9.12.0.\n' >&2
+@@ -46,7 +46,7 @@ case "${1:-setup}" in
+     printf 'Gallery dependencies and server build are ready. Real models/OAuth are configured separately.\n'
+     ;;
+   test)
+-    .venv/bin/python -m pytest services/analysis/tests services/search/tests tests/integration
++    .venv/bin/python -m pytest services/analysis/tests services/search/tests services/catalogue/tests tests/integration
+     cd apps/gallery
+     pnpm_run check
+     pnpm_run exec eslint .
+diff --git a/services/catalogue/README.md b/services/catalogue/README.md
+new file mode 100644
+index 0000000..316bf62
+--- /dev/null
++++ b/services/catalogue/README.md
+@@ -0,0 +1,68 @@
++# Gallery local catalogue — first ingestion slice
++
++A trusted local-operator CLI imports an explicitly selected directory into Gallery-owned
++content-addressed blobs and SQLite metadata. It uses no Extract, MySQL, OAuth, Analysis,
++Search, Ollama, network, or model runtime. Python 3.12 and a Unix filesystem are required.
++
++```bash
++# From the repository root; setup also installs this package.
++uv pip install --python .venv/bin/python -e 'services/catalogue[test]'
++.venv/bin/gallery-catalogue --state-root /approved/gallery-state --owner device-owner \
++  import-local --source-root /approved/photos --source-id local-photos
++.venv/bin/gallery-catalogue --state-root /approved/gallery-state --owner device-owner list --limit 50
++```
++
++Select only authorized collections. Keep state outside Git and outside the source tree.
++The local CLI's owner parameter selects scope; it is **not authentication**. This CLI is
++not a public API. Operators and filesystem permissions protect state; an HTTP adapter must
++resolve ownership from signed Gallery sessions, never accept arbitrary client owner IDs or
++source paths, and authorize media access before returning bytes or locators.
++
++## Behavior
++
++- Streams real bytes into owned storage; SHA-256 proves canonical identity. Identical bytes
++  share one asset and preserve every source/path occurrence.
++- Emits pinned `asset-record` and `source-occurrence-record` v1 records without changing the
++  shared schemas. Asset storage locators are server-local absolute paths usable by Analysis.
++- Stores sources scoped by owner and source ID; source IDs cannot silently change roots.
++  Assets share storage, but catalogue listings return only the caller scope's occurrences.
++- Re-import is idempotent. First-observed provenance stays unchanged. New bytes at an old
++  path create a new asset/occurrence; historical records and stored bytes remain available.
++- Lists canonical records in asset-ID order with `results` and nullable `next_cursor`.
++  Each result contains `asset` and structurally associated `source_occurrences`. This is a
++  catalogue envelope, not the Search result API. Limit is 1–200; use cursors for the same owner.
++- Skips symlinks, linked directories, and special files with explicit `skipped_paths`.
++  Read errors or detected mid-copy changes fail the import and roll back collection metadata.
++  Unreferenced blobs may remain after failure and are reused on retry. Existing blobs are
++  hash-verified on re-import; detected corruption fails rather than reporting a new ready asset.
++- Copies rather than edits originals. MIME type is a filename-based hint, not verified content
++  detection; the first imported hint is retained for a byte-identical canonical asset.
++
++## Limits and handoff
++
++This is a synchronous first slice, not milestone 1 completion. Source trees must be trusted
++and stable during import: this is not a sandbox against concurrent malicious directory swaps.
++Listing does not re-verify every blob; Analysis independently verifies canonical bytes before
++inference. No source deletion reconciliation, quotas, resumable jobs, automatic orphan cleanup,
++user annotation storage, Extract collection manifest importer, Drive ingestion, HTTP/media API,
++or Expo UI wiring exists yet. Existing app fixtures/review state remain unchanged.
++
++A persistent host needs durable, access-controlled storage for `catalogue.sqlite` and `blobs/`
++together, backups, disk capacity for copied bytes, and authorized readable collection mounts.
++Cloud tests prove temporary-host import/restart and fixture Analysis/Search interoperability,
++not production persistence, real model inference, or native device behavior.
++
++Next: expose authenticated paginated catalogue/media operations through Gallery's backend and
++wire an explicit real-library UI mode while preserving review overrides and fixture evaluation.
++
++## Checks
++
++```bash
++.venv/bin/python -m pytest services/catalogue/tests tests/integration
++.venv/bin/ruff check services/catalogue
++.venv/bin/mypy --strict services/catalogue/src
++```
++
++Tests validate both pinned schemas, duplicate/provenance semantics, process restart, owner
++isolation, changed-source history, pagination, symlink/special-file skipping, rollback/retry,
++corruption failure, CLI errors, and ingestion → fixture Analysis → visual Search.
+diff --git a/services/catalogue/pyproject.toml b/services/catalogue/pyproject.toml
+new file mode 100644
+index 0000000..25a4d0b
+--- /dev/null
++++ b/services/catalogue/pyproject.toml
+@@ -0,0 +1,23 @@
++[build-system]
++requires = ["setuptools>=69"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "gallery-catalogue"
++version = "0.1.0"
++description = "Gallery-owned local collection ingestion and durable canonical catalogue"
++requires-python = ">=3.12"
++dependencies = []
++
++[project.optional-dependencies]
++test = ["pytest>=8,<9", "jsonschema>=4,<5"]
++
++[project.scripts]
++gallery-catalogue = "catalogue_service.cli:main"
++
++[tool.setuptools.packages.find]
++where = ["src"]
++
++[tool.ruff]
++line-length = 100
++target-version = "py312"
+diff --git a/services/catalogue/src/catalogue_service/__init__.py b/services/catalogue/src/catalogue_service/__init__.py
+new file mode 100644
+index 0000000..3760ed9
+--- /dev/null
++++ b/services/catalogue/src/catalogue_service/__init__.py
+@@ -0,0 +1 @@
++"""Gallery-owned catalogue; no Extract, Ollama, or hosted runtime dependency."""
+diff --git a/services/catalogue/src/catalogue_service/cli.py b/services/catalogue/src/catalogue_service/cli.py
+new file mode 100644
+index 0000000..452d096
+--- /dev/null
++++ b/services/catalogue/src/catalogue_service/cli.py
+@@ -0,0 +1,44 @@
++"""Trusted local operator CLI; never expose owner selection directly over HTTP."""
++
++import argparse
++import json
++import sqlite3
++import sys
++from pathlib import Path
++
++from .store import Catalogue
++
++
++def main() -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--state-root", required=True, type=Path)
++    parser.add_argument("--owner", required=True)
++    commands = parser.add_subparsers(dest="command", required=True)
++    ingest = commands.add_parser("import-local")
++    ingest.add_argument("--source-root", required=True, type=Path)
++    ingest.add_argument("--source-id", required=True)
++    browse = commands.add_parser("list")
++    browse.add_argument("--limit", type=int, default=50)
++    browse.add_argument("--cursor")
++    args = parser.parse_args()
++    catalogue = None
++    try:
++        catalogue = Catalogue(args.state_root)
++        if args.command == "import-local":
++            result = catalogue.import_collection(
++                args.source_root, owner=args.owner, source_id=args.source_id
++            )
++        else:
++            result = catalogue.list_assets(owner=args.owner, limit=args.limit, cursor=args.cursor)
++        print(json.dumps(result))
++        return 0
++    except (OSError, ValueError, sqlite3.Error) as error:
++        print(f"Catalogue operation failed: {error}", file=sys.stderr)
++        return 1
++    finally:
++        if catalogue is not None:
++            catalogue.close()
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/services/catalogue/src/catalogue_service/store.py b/services/catalogue/src/catalogue_service/store.py
+new file mode 100644
+index 0000000..c566ef3
+--- /dev/null
++++ b/services/catalogue/src/catalogue_service/store.py
+@@ -0,0 +1,207 @@
++"""Local collection ingestion into immutable blobs and an owner-scoped SQLite catalogue.
++
++Only trusted local operators may call this boundary. Owner IDs are scope selectors, not
++credentials; a future HTTP adapter must derive them from authenticated Gallery sessions.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import mimetypes
++import os
++import re
++import sqlite3
++import stat
++import tempfile
++import uuid
++from datetime import UTC, datetime
++from pathlib import Path
++from typing import Any
++
++
++class Catalogue:
++    def __init__(self, state_root: Path):
++        self.root = state_root.resolve()
++        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
++        self.blobs = self.root / "blobs"
++        self.blobs.mkdir(exist_ok=True, mode=0o700)
++        self.db = sqlite3.connect(self.root / "catalogue.sqlite")
++        self.db.execute("PRAGMA foreign_keys = ON")
++        self.db.executescript("""
++            CREATE TABLE IF NOT EXISTS sources (
++                owner TEXT NOT NULL, source_id TEXT NOT NULL, root TEXT NOT NULL,
++                PRIMARY KEY (owner, source_id)
++            );
++            CREATE TABLE IF NOT EXISTS assets (
++                asset_id TEXT PRIMARY KEY, record TEXT NOT NULL
++            );
++            CREATE TABLE IF NOT EXISTS occurrences (
++                occurrence_id TEXT PRIMARY KEY, owner TEXT NOT NULL,
++                source_id TEXT NOT NULL, asset_id TEXT NOT NULL, record TEXT NOT NULL,
++                FOREIGN KEY (owner, source_id) REFERENCES sources(owner, source_id),
++                FOREIGN KEY (asset_id) REFERENCES assets(asset_id)
++            );
++            CREATE INDEX IF NOT EXISTS occurrences_owner_asset ON occurrences(owner, asset_id);
++        """)
++
++    def close(self) -> None:
++        self.db.close()
++
++    def _copy(self, path: Path) -> tuple[str, Path, int]:
++        # Do not follow a final symlink or block on a FIFO substituted during discovery.
++        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
++        temporary: Path | None = None
++        try:
++            with os.fdopen(fd, "rb") as source:
++                before = os.fstat(source.fileno())
++                if not stat.S_ISREG(before.st_mode):
++                    raise ValueError("Only regular files may be imported")
++                digest = hashlib.sha256()
++                size = 0
++                with tempfile.NamedTemporaryFile(dir=self.blobs, delete=False) as output:
++                    temporary = Path(output.name)
++                    while chunk := source.read(1024 * 1024):
++                        output.write(chunk)
++                        digest.update(chunk)
++                        size += len(chunk)
++                    output.flush()
++                    os.fsync(output.fileno())
++                after = os.fstat(source.fileno())
++                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
++                    after.st_size,
++                    after.st_mtime_ns,
++                    after.st_ctime_ns,
++                ) or size != after.st_size:
++                    raise ValueError("Source changed during import; retry when stable")
++            content_hash = "sha256:" + digest.hexdigest()
++            destination = self.blobs / digest.hexdigest()
++            try:
++                # Atomic create without replacing an existing canonical blob.
++                os.link(temporary, destination)
++                directory_fd = os.open(self.blobs, os.O_RDONLY | os.O_DIRECTORY)
++                try:
++                    os.fsync(directory_fd)
++                finally:
++                    os.close(directory_fd)
++            except FileExistsError:
++                with destination.open("rb") as existing:
++                    if hashlib.file_digest(existing, "sha256").hexdigest() != digest.hexdigest():
++                        raise ValueError("Canonical blob is corrupt; restore it before import")
++            return content_hash, destination, size
++        finally:
++            if temporary is not None:
++                temporary.unlink(missing_ok=True)
++
++    def import_collection(self, source_root: Path, *, owner: str, source_id: str) -> dict[str, Any]:
++        if not owner.strip() or not source_id.strip():
++            raise ValueError("Owner and source ID must be non-empty")
++        root = source_root.resolve(strict=True)
++        if not root.is_dir():
++            raise ValueError("Source must be a directory")
++        if self.root.is_relative_to(root) or root.is_relative_to(self.root):
++            raise ValueError("Source and catalogue storage must be separate trees")
++        job = "ingest:" + str(uuid.uuid4())
++        observed = datetime.now(UTC).isoformat()
++        files = 0
++        skipped: list[str] = []
++        # Metadata is atomic per collection. On failure, unreferenced blobs may remain;
++        # they are never reported as ready assets and can be reused on retry.
++        with self.db:
++            existing = self.db.execute(
++                "SELECT root FROM sources WHERE owner=? AND source_id=?", (owner, source_id)
++            ).fetchone()
++            if existing and existing[0] != str(root):
++                raise ValueError("Source ID is already bound to another root")
++            self.db.execute(
++                "INSERT OR IGNORE INTO sources VALUES (?, ?, ?)", (owner, source_id, str(root))
++            )
++
++            def walk_error(error: OSError) -> None:
++                raise error
++
++            for directory, directories, names in os.walk(
++                root, followlinks=False, onerror=walk_error
++            ):
++                directories.sort()
++                for name in list(directories):
++                    path = Path(directory) / name
++                    if path.is_symlink():
++                        skipped.append(path.relative_to(root).as_posix())
++                        directories.remove(name)
++                for name in sorted(names):
++                    path = Path(directory) / name
++                    relative = path.relative_to(root).as_posix()
++                    if not stat.S_ISREG(path.lstat().st_mode):
++                        skipped.append(relative)
++                        continue
++                    asset_id, locator, size = self._copy(path)
++                    asset = {
++                        "schema": "asset-record",
++                        "schema_version": 1,
++                        "asset_id": asset_id,
++                        "content_hash": asset_id,
++                        "storage_locator": str(locator),
++                        "size_bytes": size,
++                        "mime_type": mimetypes.guess_type(name)[0] or "application/octet-stream",
++                        "processing_state": "ready",
++                    }
++                    key = json.dumps([owner, source_id, relative, asset_id], ensure_ascii=False)
++                    occurrence_id = "occurrence:sha256:" + hashlib.sha256(key.encode()).hexdigest()
++                    occurrence = {
++                        "schema": "source-occurrence-record",
++                        "schema_version": 1,
++                        "source_occurrence_id": occurrence_id,
++                        "asset_id": asset_id,
++                        "source_id": source_id,
++                        "source_kind": "local_file",
++                        "source_location": str(root),
++                        "original_path": relative,
++                        "ingest_job_id": job,
++                        "observed_at": observed,
++                    }
++                    self.db.execute(
++                        "INSERT OR IGNORE INTO assets VALUES (?, ?)", (asset_id, json.dumps(asset))
++                    )
++                    self.db.execute(
++                        "INSERT OR IGNORE INTO occurrences VALUES (?, ?, ?, ?, ?)",
++                        (occurrence_id, owner, source_id, asset_id, json.dumps(occurrence)),
++                    )
++                    files += 1
++        return {"ingest_job_id": job, "files_observed": files, "skipped_paths": skipped}
++
++    def list_assets(
++        self, *, owner: str, limit: int = 50, cursor: str | None = None
++    ) -> dict[str, Any]:
++        if not owner.strip() or isinstance(limit, bool) or not 1 <= limit <= 200:
++            raise ValueError("Non-empty owner and limit between 1 and 200 required")
++        if cursor is not None and not re.fullmatch(r"sha256:[0-9a-f]{64}", cursor):
++            raise ValueError("Invalid catalogue cursor")
++        rows = self.db.execute(
++            """
++            SELECT a.asset_id, a.record FROM assets a
++            WHERE a.asset_id > ? AND EXISTS (
++                SELECT 1 FROM occurrences o WHERE o.asset_id=a.asset_id AND o.owner=?
++            ) ORDER BY a.asset_id LIMIT ?
++        """,
++            (cursor or "", owner, limit + 1),
++        ).fetchall()
++        results = []
++        for asset_id, record in rows[:limit]:
++            occurrences = self.db.execute(
++                """
++                SELECT record FROM occurrences WHERE owner=? AND asset_id=?
++                ORDER BY occurrence_id
++            """,
++                (owner, asset_id),
++            ).fetchall()
++            results.append(
++                {
++                    "asset": json.loads(record),
++                    "source_occurrences": [json.loads(item[0]) for item in occurrences],
++                }
++            )
++        return {
++            "results": results,
++            "next_cursor": rows[limit - 1][0] if len(rows) > limit else None,
++        }
+diff --git a/services/catalogue/tests/test_catalogue.py b/services/catalogue/tests/test_catalogue.py
+new file mode 100644
+index 0000000..bda5a54
+--- /dev/null
++++ b/services/catalogue/tests/test_catalogue.py
+@@ -0,0 +1,197 @@
++import hashlib
++import json
++import os
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++from jsonschema import Draft202012Validator
++
++from catalogue_service.store import Catalogue
++
++
++@pytest.fixture
++def collection(tmp_path):
++    source = tmp_path / "collection"
++    source.mkdir()
++    store = Catalogue(tmp_path / "state")
++    yield store, source
++    store.close()
++
++
++def ingest(store, source, owner="alice", source_id="camera"):
++    return store.import_collection(source, owner=owner, source_id=source_id)
++
++
++def test_duplicates_contracts_restart_and_originals(collection):
++    store, source = collection
++    (source / "a.txt").write_bytes(b"same bytes")
++    (source / "b.txt").write_bytes(b"same bytes")
++    ingest(store, source)
++    first = store.list_assets(owner="alice")
++    ingest(store, source)
++    assert store.list_assets(owner="alice") == first
++    assert len(first["results"]) == 1
++    row = first["results"][0]
++    assert row["asset"]["asset_id"] == "sha256:" + hashlib.sha256(b"same bytes").hexdigest()
++    assert len(row["source_occurrences"]) == 2
++    assert {o["original_path"] for o in row["source_occurrences"]} == {"a.txt", "b.txt"}
++    contracts = Path(__file__).resolve().parents[3] / "contracts"
++    for name, records in [
++        ("asset-record-v1.schema.json", [row["asset"]]),
++        ("source-occurrence-record-v1.schema.json", row["source_occurrences"]),
++    ]:
++        validator = Draft202012Validator(json.loads((contracts / name).read_text()))
++        for record in records:
++            validator.validate(record)
++    state = store.root
++    store.close()
++    restarted = Catalogue(state)
++    try:
++        assert restarted.list_assets(owner="alice") == first
++        (source / "a.txt").unlink()
++        assert Path(row["asset"]["storage_locator"]).read_bytes() == b"same bytes"
++        assert (source / "b.txt").read_bytes() == b"same bytes"
++    finally:
++        restarted.close()
++
++
++def test_changed_path_retains_both_assets(collection):
++    store, source = collection
++    file = source / "photo.jpg"
++    file.write_bytes(b"old")
++    ingest(store, source)
++    old = store.list_assets(owner="alice")["results"][0]
++    file.write_bytes(b"new")
++    ingest(store, source)
++    results = store.list_assets(owner="alice")["results"]
++    assert len(results) == 2
++    assert old in results
++    assert Path(old["asset"]["storage_locator"]).read_bytes() == b"old"
++
++
++def test_owner_and_source_provenance_isolation(collection, tmp_path):
++    store, source = collection
++    (source / "a.txt").write_bytes(b"same")
++    ingest(store, source)
++    assert store.list_assets(owner="bob")["results"] == []
++    ingest(store, source, owner="bob")
++    ingest(store, source, source_id="backup")
++    alice = store.list_assets(owner="alice")["results"][0]
++    bob = store.list_assets(owner="bob")["results"][0]
++    assert alice["asset"] == bob["asset"]
++    assert len(alice["source_occurrences"]) == 2
++    assert len(bob["source_occurrences"]) == 1
++    assert bob["source_occurrences"][0] not in alice["source_occurrences"]
++    other = tmp_path / "other"
++    other.mkdir()
++    with pytest.raises(ValueError, match="another root"):
++        ingest(store, other)
++
++
++def test_pagination_and_empty_collection(collection):
++    store, source = collection
++    assert ingest(store, source)["files_observed"] == 0
++    assert store.list_assets(owner="alice") == {"results": [], "next_cursor": None}
++    for i in range(5):
++        (source / str(i)).write_bytes(str(i).encode())
++    ingest(store, source)
++    cursor = None
++    ids = []
++    while True:
++        page = store.list_assets(owner="alice", limit=2, cursor=cursor)
++        ids.extend(row["asset"]["asset_id"] for row in page["results"])
++        cursor = page["next_cursor"]
++        if cursor is None:
++            break
++    assert len(ids) == len(set(ids)) == 5
++    assert ids == sorted(ids)
++    for kwargs in [{"limit": 0}, {"limit": 201}, {"cursor": "bad"}]:
++        with pytest.raises(ValueError):
++            store.list_assets(owner="alice", **kwargs)
++
++
++def test_skip_symlinks_and_special_files(collection, tmp_path):
++    store, source = collection
++    outside = tmp_path / "outside"
++    outside.mkdir()
++    (outside / "secret.txt").write_text("outside")
++    (source / "link.txt").symlink_to(outside / "secret.txt")
++    (source / "directory-link").symlink_to(outside, target_is_directory=True)
++    os.mkfifo(source / "pipe")
++    report = ingest(store, source)
++    assert set(report["skipped_paths"]) == {"link.txt", "directory-link", "pipe"}
++    assert report["files_observed"] == 0
++    assert store.list_assets(owner="alice")["results"] == []
++
++
++def test_reject_overlapping_storage(collection):
++    store, _source = collection
++    with pytest.raises(ValueError, match="separate trees"):
++        ingest(store, store.root.parent)
++    with pytest.raises(ValueError, match="separate trees"):
++        ingest(store, store.blobs)
++
++
++def test_collection_failure_rolls_back_metadata_and_retry_works(collection, monkeypatch):
++    store, source = collection
++    (source / "a").write_bytes(b"a")
++    (source / "b").write_bytes(b"b")
++    original_copy = store._copy
++
++    def fail_second(path):
++        if path.name == "b":
++            raise OSError("unreadable")
++        return original_copy(path)
++
++    monkeypatch.setattr(store, "_copy", fail_second)
++    with pytest.raises(OSError, match="unreadable"):
++        ingest(store, source)
++    assert store.list_assets(owner="alice")["results"] == []
++    monkeypatch.setattr(store, "_copy", original_copy)
++    ingest(store, source)
++    assert len(store.list_assets(owner="alice")["results"]) == 2
++
++
++def test_corrupt_existing_blob_fails_without_ready_record(collection):
++    store, source = collection
++    (source / "a").write_bytes(b"a")
++    digest = hashlib.sha256(b"a").hexdigest()
++    (store.blobs / digest).write_bytes(b"corrupt")
++    with pytest.raises(ValueError, match="corrupt"):
++        ingest(store, source)
++    assert store.list_assets(owner="alice")["results"] == []
++    assert not list(store.blobs.glob("tmp*"))
++
++
++def test_cli_real_process_restart_and_failure(tmp_path):
++    source = tmp_path / "source"
++    source.mkdir()
++    (source / "note.txt").write_text("real local collection")
++    command = [
++        sys.executable,
++        "-m",
++        "catalogue_service.cli",
++        "--state-root",
++        str(tmp_path / "state"),
++        "--owner",
++        "alice",
++    ]
++    imported = subprocess.run(
++        command + ["import-local", "--source-root", str(source), "--source-id", "notes"],
++        capture_output=True,
++        text=True,
++        check=False,
++    )
++    assert imported.returncode == 0, imported.stderr
++    assert json.loads(imported.stdout)["files_observed"] == 1
++    listed = subprocess.run(command + ["list"], capture_output=True, text=True, check=False)
++    assert listed.returncode == 0, listed.stderr
++    row = json.loads(listed.stdout)["results"][0]
++    assert Path(row["asset"]["storage_locator"]).read_text() == "real local collection"
++    failed = subprocess.run(
++        command + ["list", "--limit", "0"], capture_output=True, text=True, check=False
++    )
++    assert failed.returncode == 1
++    assert failed.stdout == ""
+diff --git a/tests/integration/test_analysis_search.py b/tests/integration/test_analysis_search.py
+index b15619f..67081c7 100644
+--- a/tests/integration/test_analysis_search.py
++++ b/tests/integration/test_analysis_search.py
+@@ -59,3 +59,33 @@ def test_real_analysis_serialized_feature_indexes_and_retrieves_exact_result_pro
+         rerun_input = visual_feature_input_from_analysis(rerun.visual_features[0].to_dict())
+         search.index_visual_feature(rerun_input)
+         assert search.find_visually_similar(asset_a.asset_id, search_a.profile)[0].analysis_result_id == rerun.result_id
++
++
++def test_local_catalogue_bytes_feed_existing_analysis_search_contracts(tmp_path):
++    from catalogue_service.store import Catalogue
++
++    source = tmp_path / "collection"
++    source.mkdir()
++    Image.new("RGB", (2, 2), "red").save(source / "a.png")
++    Image.new("RGB", (2, 2), "blue").save(source / "b.png")
++    catalogue = Catalogue(tmp_path / "catalogue")
++    try:
++        catalogue.import_collection(source, owner="alice", source_id="local-photos")
++        rows = catalogue.list_assets(owner="alice")["results"]
++    finally:
++        catalogue.close()
++    # Analysis must read owned canonical bytes, even if originals disappear.
++    for path in source.iterdir():
++        path.unlink()
++    analysis = AnalysisService(backend=DeterministicBackend(), output_root=tmp_path / "analysis")
++    inputs = []
++    for row in rows:
++        asset = AssetInput.from_asset_record(row["asset"])
++        record = analysis.analyse(asset).record
++        assert record.input_content_hash == asset.asset_id
++        inputs.append(visual_feature_input_from_analysis(record.visual_features[0].to_dict()))
++    with VisualSearchService(tmp_path / "search.sqlite3") as search:
++        for feature in inputs:
++            search.index_visual_feature(feature)
++        matches = search.find_visually_similar(inputs[0].asset_id, inputs[0].profile)
++        assert [result.asset_id for result in matches] == [inputs[1].asset_id]

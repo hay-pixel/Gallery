@@ -1,0 +1,63 @@
+{
+  "folders": [
+    {
+      "name": "Gallery 1.1.0 \u2014 Drive client",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.venv": true,
+      "**/.expo": true
+    },
+    "search.exclude": {
+      "**/android-dist": true,
+      "**/web-dist": true,
+      "**/node_modules": true,
+      "**/android/.gradle": true,
+      "**/android/app/build": true
+    }
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Gallery: check",
+        "type": "shell",
+        "command": "corepack pnpm check",
+        "options": {
+          "cwd": "${workspaceFolder}/apps/gallery"
+        },
+        "problemMatcher": "$tsc"
+      },
+      {
+        "label": "Gallery: app tests",
+        "type": "shell",
+        "command": "corepack pnpm test",
+        "options": {
+          "cwd": "${workspaceFolder}/apps/gallery"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Gallery: API build",
+        "type": "shell",
+        "command": "corepack pnpm build",
+        "options": {
+          "cwd": "${workspaceFolder}/apps/gallery"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "Gallery: Metro",
+        "type": "shell",
+        "command": "corepack pnpm native:start",
+        "options": {
+          "cwd": "${workspaceFolder}/apps/gallery"
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
