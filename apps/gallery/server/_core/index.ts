@@ -1,4 +1,6 @@
 import "dotenv/config";
+import fs from "fs";
+import path from "path";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -71,6 +73,15 @@ export async function startServer() {
       createContext,
     }),
   );
+
+  const publicDir = path.resolve(process.cwd(), "dist/public");
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api/")) return next();
+      res.sendFile(path.join(publicDir, "index.html"));
+    });
+  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = process.env.NODE_ENV === "production" ? preferredPort : await findAvailablePort(preferredPort);

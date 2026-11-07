@@ -1,0 +1,29 @@
+# Caddy configuration for Gallery with Ollama (ap-southeast-2)
+# Replace {$GALLERY_DOMAIN} with your actual domain name (e.g. gallery.yourdomain.com)
+
+{$GALLERY_DOMAIN:localhost} {
+    # Automatic TLS via Let's Encrypt / ZeroSSL
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Proxy all traffic to the Node.js application server
+    reverse_proxy 127.0.0.1:3000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+
+    # Log requests
+    log {
+        output file /var/log/caddy/gallery.access.log {
+            roll_size 20mb
+            roll_keep 5
+        }
+    }
+}
+

@@ -1,0 +1,24 @@
+[Unit]
+Description=Private Ollama Service Daemon
+After=network.target
+
+[Service]
+Type=exec
+User=gallery
+Group=gallery
+Environment="OLLAMA_HOST=127.0.0.1:11434"
+Environment="OLLAMA_MODELS=/var/lib/gallery/ollama/models"
+Environment="OLLAMA_ORIGINS=http://127.0.0.1:*"
+ExecStart=/usr/local/bin/ollama serve
+Restart=always
+RestartSec=5s
+
+# Hardening & Security
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gallery/ollama
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

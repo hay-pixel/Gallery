@@ -37,7 +37,7 @@ jobs:
   - bash: |
       set -euo pipefail
       mkdir -p test-results
-      .venv/bin/python -m pytest services/analysis/tests services/search/tests tests/integration --junitxml=test-results/python.xml
+      .venv/bin/python -m pytest services/analysis/tests services/search/tests services/ollama/tests tests/integration --junitxml=test-results/python.xml
     displayName: Test Analysis, Search, and integration
   - bash: |
       set -euo pipefail

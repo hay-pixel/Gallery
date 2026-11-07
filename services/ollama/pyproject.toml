@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ollamabinsaden-ollama"
+version = "1.0.0"
+description = "Project-owned Ollama inference, query planning, and grounded reasoning adapter"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["mypy>=1.11,<2", "pytest>=8,<9", "ruff>=0.8,<1"]
+
+[project.scripts]
+ollamabinsaden-ollama = "ollama_service.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+exclude = ["tests/"]

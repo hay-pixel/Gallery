@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { googleDriveSources, InsertGoogleDriveSource } from "../drizzle/schema";
+import { assets, googleDriveSources, InsertGoogleDriveSource } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -70,4 +70,66 @@ export async function listGoogleDriveSourceRecords(ownerKey: string) {
   const db = await getDb();
   if (!db) throw new Error("Database is unavailable");
   return db.select().from(googleDriveSources).where(eq(googleDriveSources.ownerKey, ownerKey));
+}
+
+export async function listCatalogueAssets() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(assets);
+}
+
+export async function getAssetById(assetId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const res = await db.select().from(assets).where(eq(assets.assetId, assetId)).limit(1);
+  return res[0] ?? null;
+}
+
+export async function updateAssetReviewState(
+  assetId: string,
+  reviewState: "NEEDS_REVIEW" | "APPROVED" | "SKIPPED",
+  reviewEvidence?: string,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db
+    .update(assets)
+    .set({
+      reviewState,
+      reviewEvidence: reviewEvidence ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(assets.assetId, assetId));
+}
+
+export async function updateAssetCategory(
+  assetId: string,
+  primaryCategory: string,
+  subcategory?: string,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  await db
+    .update(assets)
+    .set({
+      primaryCategory,
+      subcategory: subcategory ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(assets.assetId, assetId));
+}
+
+export async function setDuplicatePreference(assetId: string, duplicateGroupId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is unavailable");
+  // Clear any existing preference in the group
+  await db
+    .update(assets)
+    .set({ isPreferredCopy: 0 })
+    .where(eq(assets.duplicateGroupId, duplicateGroupId));
+  // Set preferred copy
+  await db
+    .update(assets)
+    .set({ isPreferredCopy: 1, updatedAt: new Date() })
+    .where(eq(assets.assetId, assetId));
 }

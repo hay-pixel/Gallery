@@ -4,14 +4,15 @@ Standalone universal file library: authorized sources, unified catalogue, browse
 
 ## Current status
 
-The Expo/React Native + Node app, read-only Google Drive OAuth, image-v1 Analysis, visual Search, and Analysis→Search bridge are migrated. Full metadata/semantic/hybrid Search, real catalogue integration, and the Ollama adapter remain unfinished. `services/ollama` currently holds documentation, not a completed runtime.
+The Expo/React Native + Node app, read-only Google Drive OAuth, canonical catalogue domain (import, atomic merge, two-slot offline cache, local source discovery, session isolation, companion launcher), image-v1 Analysis, visual/metadata/semantic/hybrid Search (`services/search`), Analysis→Search bridge, private Ollama service adapter (`services/ollama`), universal source ingestion engine (`services/ingest.py`), and localhost AI Gateway (`services/gateway.py`) are implemented and tested. Live production AWS infrastructure provisioning and physical device release verification remain pending.
 
 ## Layout
 
-- `apps/gallery/`: frontend, Node backend, OAuth, MySQL migrations, app tests.
+- `apps/gallery/`: frontend, Node backend, OAuth, MySQL migrations, canonical catalogue/source/cache/search/ollama boundary modules, app tests.
 - `services/analysis/`: Python classification, optional OCR, immutable results/features.
-- `services/search/`: Python/SQLite/NumPy visual retrieval.
-- `services/ollama/`: planned project-owned adapter/tools.
+- `services/search/`: Python/SQLite/NumPy visual, metadata, semantic, and hybrid retrieval.
+- `services/ollama/`: Python project-owned private Ollama adapter, bounded tools, query router, and citation grounding verifier.
+- `services/ingest.py` & `services/gateway.py`: universal source connector/ingestion engine and unified localhost AI Gateway.
 - `contracts/`: pinned asset JSON Schema and source/version manifest.
 - `docs/contracts/`: accepted Analysis, VisualFeature, Search, Query, Ollama contracts.
 - `tests/`: integration/evaluation; `deploy/aws/`: deployment plan.
@@ -60,8 +61,8 @@ Python 3.12, from repository root:
 ```bash
 python3.12 -m venv .venv
 . .venv/bin/activate
-python -m pip install -e 'services/analysis[test]' -e 'services/search[test]'
-pytest services/analysis/tests services/search/tests tests/integration
+python -m pip install -e 'services/analysis[test]' -e 'services/search[test]' -e 'services/ollama[test]'
+pytest services/analysis/tests services/search/tests services/ollama/tests tests/integration
 ```
 
 Tests use fixture backends. Real model verification needs dependencies/cache in `services/analysis/README.md`. Baseline ResNet-18 provides classifier tags and embeddings, not general object detection/captioning. OCR is optional and requires Tesseract.

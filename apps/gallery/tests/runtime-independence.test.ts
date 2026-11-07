@@ -12,9 +12,36 @@ describe("runtime independence and source boundaries", () => {
   });
 
   it("keeps Drive provider IDs explicitly source-scoped rather than canonical", () => {
-    const screen = readFileSync(join(process.cwd(), "app/(tabs)/index.tsx"), "utf8");
-    expect(screen).toContain("type DriveFile = { id: string");
-    expect(screen).toContain("type FileRecord");
-    expect(screen).not.toMatch(/assetId:\s*file\.id/);
+    const types = readFileSync(join(process.cwd(), "lib/catalogue/types.ts"), "utf8");
+    expect(types).toContain("export type DiscoveredSourceItem");
+    expect(types).toContain("discoveryHandle: string");
+    expect(types).not.toMatch(/asset_id:\s*string;\s*providerKind/);
+  });
+
+  it("forbids raw Ollama port 11434, /api/tags|show|generate, or EXPO_PUBLIC_*OLLAMA* in client code and config", () => {
+    const root = join(process.cwd());
+    const clientDirs = ["app", "components", "features", "lib", "hooks", "constants"];
+    const clientFiles = clientDirs.flatMap((dir) => {
+      try {
+        return sourceFiles(join(root, dir));
+      } catch {
+        return [];
+      }
+    });
+
+    const violations = clientFiles.flatMap((filePath) => {
+      const text = readFileSync(filePath, "utf8");
+      if (
+        /11434|\/api\/(?:tags|show|generate|chat)|EXPO_PUBLIC_[A-Z0-9_]*OLLAMA/i.test(text)
+      ) {
+        return [relative(root, filePath)];
+      }
+      return [];
+    });
+    expect(violations).toEqual([]);
+
+    const envExample = readFileSync(join(root, ".env.example"), "utf8");
+    expect(envExample).not.toMatch(/EXPO_PUBLIC_[A-Z0-9_]*OLLAMA/i);
+    expect(envExample).not.toContain("11434");
   });
 });

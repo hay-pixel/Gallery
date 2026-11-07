@@ -1,12 +1,16 @@
 # AWS deployment implementation plan
 
-No application infrastructure has been provisioned. Selected Region: `ap-southeast-2`; developer profile: `ollamabinsaden`.
+Target environment:
+- Selected Region: `ap-southeast-2` (Sydney)
+- Developer/project profile: `ollamabinsaden`
+- Deployment runbook: [DEPLOYMENT.md](DEPLOYMENT.md)
 
-1. Verify project paid/free plan, supported services, spend limit, and workload sizing.
-2. Describe infrastructure as code; select an EC2/Linux baseline where persistent local workers, SQLite, model caches, or tmux require it.
-3. Assign a least-privilege service role; use OIDC for CI rather than stored developer login credentials.
-4. Separate service/configuration/storage ownership; bind private workers and Ollama privately and expose only authenticated intended application APIs.
-5. Configure durable EBS/state backups, optional S3 transfers, logs/metrics, health checks, restarts, and recovery procedures.
-6. Deploy reviewed artifacts and verify product-specific real-data/live-agent acceptance before marking a release complete.
+## Packaged Deployment Artifacts
 
-See the root README for product-specific scope, proposed resources, and acceptance milestones. Historical Azure addresses, paths, and host assumptions are not the current target.
+- [DEPLOYMENT.md](DEPLOYMENT.md): End-to-end operational guide, security group configuration, and verification steps.
+- [mount-ebs.sh](mount-ebs.sh): Script to safely format and mount the persistent EBS volume at `/var/lib/gallery` for model weights, analysis store, and SQLite search index.
+- [gallery-ai.service](gallery-ai.service): Systemd unit for the private Python AI Gateway (`services/gateway.py`) on `127.0.0.1:8000`.
+- [gallery-web.service](gallery-web.service): Systemd unit for the Node.js API server (`dist/index.mjs`) on `127.0.0.1:3000`.
+- [ollama.service](ollama.service): Systemd unit for the private Ollama daemon bound strictly to `127.0.0.1:11434`.
+
+See the root [README.md](../../README.md) for product-specific scope and contracts. Historical Azure addresses, paths, and host assumptions are not the current target.

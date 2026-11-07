@@ -23,6 +23,11 @@ from .models import (
     IndexState,
     IndexStatus,
     IndexUnavailableError,
+    MetadataDocumentInput,
+    SemanticAssetSearchState,
+    SemanticEmbeddingInput,
+    SemanticProfile,
+    SourceOccurrenceProvenance,
     VisualFeatureInput,
     utc_now,
 )
@@ -37,6 +42,19 @@ class StoredVector:
     asset_id: str
     content_hash: str
     feature_id: str
+    analysis_id: str | None
+    analysis_result_id: str | None
+    vector_blob: bytes
+    vector_norm: float
+
+
+@dataclass(frozen=True)
+class StoredSemanticVector:
+    """Internal persisted semantic vector row."""
+
+    asset_id: str
+    content_hash: str
+    semantic_input_revision: str
     analysis_id: str | None
     analysis_result_id: str | None
     vector_blob: bytes
@@ -117,6 +135,58 @@ class VisualIndexStore:
 
                 CREATE INDEX IF NOT EXISTS vectors_active_profile
                     ON vectors(partition_key, stale, asset_id);
+
+                CREATE TABLE IF NOT EXISTS metadata_documents (
+                    asset_id TEXT PRIMARY KEY,
+                    content_hash TEXT NOT NULL,
+                    mime_type TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+                    original_path TEXT NOT NULL,
+                    source_kind TEXT NOT NULL,
+                    source_location TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    subcategory TEXT,
+                    tags_json TEXT NOT NULL,
+                    categories_json TEXT NOT NULL,
+                    ocr_text TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    analysis_status TEXT NOT NULL,
+                    analysis_id TEXT,
+                    analysis_result_id TEXT,
+                    source_occurrences_json TEXT NOT NULL,
+                    indexed_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS semantic_profiles (
+                    partition_key TEXT PRIMARY KEY,
+                    model_id TEXT NOT NULL,
+                    model_version TEXT NOT NULL,
+                    dimension INTEGER NOT NULL CHECK (dimension > 0),
+                    similarity_family TEXT NOT NULL CHECK (similarity_family = 'cosine'),
+                    revision INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+                    updated_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS semantic_vectors (
+                    partition_key TEXT NOT NULL,
+                    asset_id TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    semantic_input_revision TEXT NOT NULL,
+                    analysis_id TEXT,
+                    analysis_result_id TEXT,
+                    generated_at TEXT NOT NULL,
+                    indexed_at TEXT NOT NULL,
+                    vector_blob BLOB NOT NULL,
+                    vector_norm REAL NOT NULL CHECK (vector_norm > 0),
+                    stale INTEGER NOT NULL DEFAULT 0 CHECK (stale IN (0, 1)),
+                    stale_reason TEXT,
+                    PRIMARY KEY (partition_key, asset_id),
+                    FOREIGN KEY (partition_key) REFERENCES semantic_profiles(partition_key) ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS semantic_vectors_active_profile
+                    ON semantic_vectors(partition_key, stale, asset_id);
                 """
             )
             if current_version == 0:
@@ -472,3 +542,326 @@ class VisualIndexStore:
                 )
             self._touch_profile(connection, profile)
         return self.get_status(profile)
+
+    def upsert_metadata(self, doc: MetadataDocumentInput) -> bool:
+        """Idempotently store one metadata document; return whether derived state changed."""
+        tags_json = json.dumps(list(doc.tags), separators=(",", ":"))
+        categories_json = json.dumps(list(doc.categories), separators=(",", ":"))
+        occurrences_json = json.dumps(
+            [occ.to_dict() for occ in doc.source_occurrences], sort_keys=True, separators=(",", ":")
+        )
+        with self.transaction() as connection:
+            existing = connection.execute(
+                "SELECT * FROM metadata_documents WHERE asset_id = ?", (doc.asset_id,)
+            ).fetchone()
+            if existing is not None:
+                same = (
+                    str(existing["content_hash"]) == doc.content_hash
+                    and str(existing["mime_type"]) == doc.mime_type
+                    and int(existing["size_bytes"]) == doc.size_bytes
+                    and str(existing["original_path"]) == doc.original_path
+                    and str(existing["source_kind"]) == doc.source_kind
+                    and str(existing["source_location"]) == doc.source_location
+                    and str(existing["category"]) == doc.category
+                    and existing["subcategory"] == doc.subcategory
+                    and str(existing["tags_json"]) == tags_json
+                    and str(existing["categories_json"]) == categories_json
+                    and str(existing["ocr_text"]) == doc.ocr_text
+                    and str(existing["summary"]) == doc.summary
+                    and str(existing["analysis_status"]) == doc.analysis_status
+                    and existing["analysis_id"] == doc.analysis_id
+                    and existing["analysis_result_id"] == doc.analysis_result_id
+                    and str(existing["source_occurrences_json"]) == occurrences_json
+                )
+                if same:
+                    return False
+            now = utc_now()
+            connection.execute(
+                """
+                INSERT INTO metadata_documents (
+                    asset_id, content_hash, mime_type, size_bytes, original_path,
+                    source_kind, source_location, category, subcategory, tags_json,
+                    categories_json, ocr_text, summary, analysis_status, analysis_id,
+                    analysis_result_id, source_occurrences_json, indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(asset_id) DO UPDATE SET
+                    content_hash = excluded.content_hash,
+                    mime_type = excluded.mime_type,
+                    size_bytes = excluded.size_bytes,
+                    original_path = excluded.original_path,
+                    source_kind = excluded.source_kind,
+                    source_location = excluded.source_location,
+                    category = excluded.category,
+                    subcategory = excluded.subcategory,
+                    tags_json = excluded.tags_json,
+                    categories_json = excluded.categories_json,
+                    ocr_text = excluded.ocr_text,
+                    summary = excluded.summary,
+                    analysis_status = excluded.analysis_status,
+                    analysis_id = excluded.analysis_id,
+                    analysis_result_id = excluded.analysis_result_id,
+                    source_occurrences_json = excluded.source_occurrences_json,
+                    indexed_at = excluded.indexed_at
+                """,
+                (
+                    doc.asset_id,
+                    doc.content_hash,
+                    doc.mime_type,
+                    doc.size_bytes,
+                    doc.original_path,
+                    doc.source_kind,
+                    doc.source_location,
+                    doc.category,
+                    doc.subcategory,
+                    tags_json,
+                    categories_json,
+                    doc.ocr_text,
+                    doc.summary,
+                    doc.analysis_status,
+                    doc.analysis_id,
+                    doc.analysis_result_id,
+                    occurrences_json,
+                    now,
+                ),
+            )
+            return True
+
+    def list_metadata_documents(self) -> list[MetadataDocumentInput]:
+        """Return all persisted metadata documents ordered deterministically by asset_id."""
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM metadata_documents ORDER BY asset_id"
+            ).fetchall()
+        results: list[MetadataDocumentInput] = []
+        for row in rows:
+            occ_dicts = json.loads(str(row["source_occurrences_json"]))
+            occurrences = tuple(
+                SourceOccurrenceProvenance(
+                    source_occurrence_id=str(item["source_occurrence_id"]),
+                    source_id=str(item["source_id"]),
+                    original_path=str(item["original_path"]),
+                    source_kind=item.get("source_kind"),
+                    source_location=item.get("source_location"),
+                    source_archive_id=item.get("source_archive_id"),
+                    source_member=item.get("source_member"),
+                )
+                for item in occ_dicts
+            )
+            results.append(
+                MetadataDocumentInput(
+                    asset_id=str(row["asset_id"]),
+                    content_hash=str(row["content_hash"]),
+                    mime_type=str(row["mime_type"]),
+                    size_bytes=int(row["size_bytes"]),
+                    original_path=str(row["original_path"]),
+                    source_kind=str(row["source_kind"]),
+                    source_location=str(row["source_location"]),
+                    category=str(row["category"]),
+                    subcategory=str(row["subcategory"]) if row["subcategory"] is not None else None,
+                    tags=tuple(json.loads(str(row["tags_json"]))),
+                    categories=tuple(json.loads(str(row["categories_json"]))),
+                    ocr_text=str(row["ocr_text"]),
+                    summary=str(row["summary"]),
+                    analysis_status=str(row["analysis_status"]),
+                    analysis_id=str(row["analysis_id"]) if row["analysis_id"] is not None else None,
+                    analysis_result_id=str(row["analysis_result_id"])
+                    if row["analysis_result_id"] is not None
+                    else None,
+                    source_occurrences=occurrences,
+                )
+            )
+        return results
+
+    def get_metadata_document(self, asset_id: str) -> MetadataDocumentInput | None:
+        for doc in self.list_metadata_documents():
+            if doc.asset_id == asset_id:
+                return doc
+        return None
+
+    def _ensure_semantic_profile(
+        self, connection: sqlite3.Connection, profile: SemanticProfile
+    ) -> None:
+        row = connection.execute(
+            "SELECT * FROM semantic_profiles WHERE partition_key = ?", (profile.partition_key,)
+        ).fetchone()
+        if row is None:
+            now = utc_now()
+            connection.execute(
+                """
+                INSERT INTO semantic_profiles (
+                    partition_key, model_id, model_version, dimension,
+                    similarity_family, revision, updated_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+                """,
+                (
+                    profile.partition_key,
+                    profile.model_id,
+                    profile.model_version,
+                    profile.dimension,
+                    profile.similarity_family,
+                    now,
+                    now,
+                ),
+            )
+            return
+        if (
+            str(row["model_id"]) != profile.model_id
+            or str(row["model_version"]) != profile.model_version
+            or int(row["dimension"]) != profile.dimension
+        ):
+            raise ContractError("semantic profile partition collision")
+
+    @staticmethod
+    def _touch_semantic_profile(
+        connection: sqlite3.Connection, profile: SemanticProfile
+    ) -> None:
+        connection.execute(
+            """
+            UPDATE semantic_profiles
+            SET revision = revision + 1, updated_at = ?
+            WHERE partition_key = ?
+            """,
+            (utc_now(), profile.partition_key),
+        )
+
+    def upsert_semantic(self, embedding: SemanticEmbeddingInput) -> bool:
+        """Idempotently store one semantic vector; return whether derived state changed."""
+        vector_blob, vector_norm = self._vector_blob(
+            embedding.values, embedding.profile.dimension
+        )
+        with self.transaction() as connection:
+            self._ensure_semantic_profile(connection, embedding.profile)
+            existing = connection.execute(
+                "SELECT * FROM semantic_vectors WHERE partition_key = ? AND asset_id = ?",
+                (embedding.profile.partition_key, embedding.asset_id),
+            ).fetchone()
+            if existing is not None:
+                same = (
+                    bytes(existing["vector_blob"]) == vector_blob
+                    and str(existing["content_hash"]) == embedding.content_hash
+                    and str(existing["semantic_input_revision"])
+                    == embedding.semantic_input_revision
+                    and existing["analysis_id"] == embedding.analysis_id
+                    and existing["analysis_result_id"] == embedding.analysis_result_id
+                    and int(existing["stale"]) == 0
+                )
+                if same:
+                    return False
+            now = utc_now()
+            connection.execute(
+                """
+                INSERT INTO semantic_vectors (
+                    partition_key, asset_id, content_hash, semantic_input_revision,
+                    analysis_id, analysis_result_id, generated_at, indexed_at,
+                    vector_blob, vector_norm, stale, stale_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
+                ON CONFLICT(partition_key, asset_id) DO UPDATE SET
+                    content_hash = excluded.content_hash,
+                    semantic_input_revision = excluded.semantic_input_revision,
+                    analysis_id = excluded.analysis_id,
+                    analysis_result_id = excluded.analysis_result_id,
+                    generated_at = excluded.generated_at,
+                    indexed_at = excluded.indexed_at,
+                    vector_blob = excluded.vector_blob,
+                    vector_norm = excluded.vector_norm,
+                    stale = 0,
+                    stale_reason = NULL
+                """,
+                (
+                    embedding.profile.partition_key,
+                    embedding.asset_id,
+                    embedding.content_hash,
+                    embedding.semantic_input_revision,
+                    embedding.analysis_id,
+                    embedding.analysis_result_id,
+                    embedding.generated_at,
+                    now,
+                    vector_blob,
+                    vector_norm,
+                ),
+            )
+            self._touch_semantic_profile(connection, embedding.profile)
+            return True
+
+    def invalidate_semantic_asset(
+        self, asset_id: str, profile: SemanticProfile, reason: str
+    ) -> bool:
+        if not reason.strip():
+            raise ContractError("stale reason must not be empty")
+        with self.transaction() as connection:
+            updated = connection.execute(
+                """
+                UPDATE semantic_vectors
+                SET stale = 1, stale_reason = ?
+                WHERE partition_key = ? AND asset_id = ? AND stale = 0
+                """,
+                (reason, profile.partition_key, asset_id),
+            ).rowcount
+            if updated:
+                self._touch_semantic_profile(connection, profile)
+            return bool(updated)
+
+    def get_semantic_asset_state(
+        self, asset_id: str, profile: SemanticProfile
+    ) -> SemanticAssetSearchState:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT stale, stale_reason, indexed_at
+                FROM semantic_vectors WHERE partition_key = ? AND asset_id = ?
+                """,
+                (profile.partition_key, asset_id),
+            ).fetchone()
+        if row is None:
+            return SemanticAssetSearchState(asset_id=asset_id, profile=profile, state="missing")
+        if int(row["stale"]):
+            return SemanticAssetSearchState(
+                asset_id=asset_id,
+                profile=profile,
+                state="stale",
+                stale_reason=str(row["stale_reason"]),
+                indexed_at=str(row["indexed_at"]),
+            )
+        return SemanticAssetSearchState(
+            asset_id=asset_id,
+            profile=profile,
+            state="indexed",
+            indexed_at=str(row["indexed_at"]),
+        )
+
+    def active_semantic_vectors(
+        self, profile: SemanticProfile
+    ) -> tuple[list[StoredSemanticVector], str]:
+        with self._lock:
+            profile_row = self._connection.execute(
+                "SELECT revision FROM semantic_profiles WHERE partition_key = ?",
+                (profile.partition_key,),
+            ).fetchone()
+            if profile_row is None:
+                raise IndexUnavailableError(
+                    f"no semantic index exists for profile {profile.index_id}"
+                )
+            rows = self._connection.execute(
+                """
+                SELECT asset_id, content_hash, semantic_input_revision, analysis_id,
+                       analysis_result_id, vector_blob, vector_norm
+                FROM semantic_vectors WHERE partition_key = ? AND stale = 0 ORDER BY asset_id
+                """,
+                (profile.partition_key,),
+            ).fetchall()
+        version = f"v{int(profile_row['revision'])}"
+        vectors = [
+            StoredSemanticVector(
+                asset_id=str(row["asset_id"]),
+                content_hash=str(row["content_hash"]),
+                semantic_input_revision=str(row["semantic_input_revision"]),
+                analysis_id=str(row["analysis_id"]) if row["analysis_id"] is not None else None,
+                analysis_result_id=str(row["analysis_result_id"])
+                if row["analysis_result_id"] is not None
+                else None,
+                vector_blob=bytes(row["vector_blob"]),
+                vector_norm=float(row["vector_norm"]),
+            )
+            for row in rows
+        ]
+        return vectors, version

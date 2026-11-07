@@ -23,5 +23,14 @@
 - [x] Remove the broken template login dependency from Drive connection and launch Google OAuth directly.
 - [x] Support multiple simultaneous linked Google Drive sources without source replacement.
 - [x] Index and render linked Drive images, videos, and ordinary files as read-only previews.
-- [ ] Integrate the Gallery with the approved private Ollama and Search service boundaries only after Gate 5 exposes a stable executable Search API and the architect assigns the Gallery integration gate.
-- [x] Synchronize the selected Pixeldrive GitHub repository with the completed mobile source and reviewer-ready documentation.
+- [x] Integrate the Gallery with the approved private Ollama and Search service boundaries (AI gateway client, tRPC sub-routers for ai, search, and catalogue with graceful offline fallback).
+- [x] Implement private Ollama Service daemon (`services/ollama`) conforming to `docs/contracts/OLLAMA.md` with bounded tools, anti-hallucination citation checks, and offline graceful degradation.
+- [x] Implement unified localhost AI Gateway (`services/gateway.py`) exposing health, ask, interpret, visual similarity search, analysis, and ingestion endpoints.
+- [x] Implement universal source connector and ingestion engine (`services/ingest.py`) with strict SHA-256 byte identity, deterministic occurrence IDs, exact duplicate detection, directory scanning, and Extract export compatibility (`contracts/`).
+- [x] Wire live visual similarity search into mobile/web Detail modal using tRPC and vector search index.
+- [x] Generate database migrations for universal catalogue schema (`sources`, `assets`, `source_occurrences`, `background_jobs`).
+- [x] Package AWS deployment service templates, EBS mount scripts, and operations guide for `ap-southeast-2` (`deploy/aws/`).
+- [x] Complete selective PR #20 port: normalized catalogue domain, atomic canonical import, durable two-slot cache, native source discovery, session store, companion launcher, and truthful search/Ollama boundaries.
+- [x] Rebuild mobile UI into focused routes (`app/(tabs)/*`) and feature modules (`features/*`) with zero lint errors and verified offline capability degradation.
+- [x] Configure Android 1.1.0 (versionCode 6) acceptance suite with read-only permissions and reproducible Caddy / systemd host bootstrap scripts.
+
