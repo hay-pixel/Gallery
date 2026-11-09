@@ -9,6 +9,7 @@ User=gallery
 Group=gallery
 WorkingDirectory=/opt/gallery
 Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONPATH=/opt/gallery"
 Environment="PATH=/opt/gallery/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/opt/gallery/.venv/bin/python services/gateway.py \
     --host 127.0.0.1 \
