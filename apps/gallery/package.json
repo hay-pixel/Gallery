@@ -17,7 +17,7 @@
     "android": "expo run:android",
     "android:prepare": "expo prebuild --platform android --no-install",
     "native:start": "expo start --localhost",
-    "ios": "expo start --ios",
+    "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs"
   },
   "dependencies": {
