@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import CryptoJS from "crypto-js";
 import { FIXTURE_FILES } from "../pixeldrive";
 import { parseAssetRecordV1, parseSourceOccurrenceRecordV1 } from "./contracts";
 import type {
@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 function deterministicOccurrenceHash(seed: string): SourceOccurrenceId {
-  const digest = createHash("sha256").update(seed).digest("hex").toLowerCase();
+  const digest = CryptoJS.SHA256(seed).toString().toLowerCase();
   return `occurrence:sha256:${digest}`;
 }
 

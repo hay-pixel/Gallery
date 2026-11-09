@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import CryptoJS from "crypto-js";
 
 export type SessionStorageBackend = {
   getItem(key: string): Promise<string | null>;
@@ -46,9 +46,8 @@ export function validateApprovedApiOrigin(rawOrigin: string): string {
 }
 
 function buildSafeOriginStorageKey(normalizedOrigin: string): string {
-  const digest = createHash("sha256")
-    .update(`gallery-session-origin:${normalizedOrigin}`)
-    .digest("hex")
+  const digest = CryptoJS.SHA256(`gallery-session-origin:${normalizedOrigin}`)
+    .toString()
     .slice(0, 32);
   return `gallery_session_v1_${digest}`;
 }
