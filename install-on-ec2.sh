@@ -70,10 +70,10 @@ fi
     fastapi uvicorn pydantic
 
 # 5. Set up Node.js server dependencies
-echo "==> [5/8] Setting up Node.js server production dependencies..."
+echo "==> [5/8] Setting up Node.js server dependencies..."
 (
     cd "${INSTALL_DIR}/apps/gallery"
-    pnpm install --prod --frozen-lockfile
+    pnpm install --frozen-lockfile
 )
 
 # 6. Database and environment configuration
@@ -104,7 +104,7 @@ mysql -e "GRANT ALL PRIVILEGES ON gallery.* TO 'gallery'@'127.0.0.1'; FLUSH PRIV
 # Run database migrations
 (
     cd "${INSTALL_DIR}/apps/gallery"
-    DATABASE_URL="mysql://gallery:gallery_local_secret@127.0.0.1:3306/gallery" pnpm exec drizzle-kit migrate
+    DATABASE_URL="mysql://gallery:gallery_local_secret@127.0.0.1:3306/gallery" pnpm exec drizzle-kit migrate --config=drizzle.config.ts
 )
 
 # 7. Install systemd services
