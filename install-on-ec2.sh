@@ -19,7 +19,7 @@ echo "==> [1/8] Installing host packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl git build-essential python3.12 python3.12-venv python3-pip \
-    tesseract-ocr libtesseract-dev caddy jq mysql-server
+    tesseract-ocr libtesseract-dev jq mysql-server
 
 # Install Node.js 22 & Corepack if missing
 if ! command -v node >/dev/null 2>&1; then
@@ -29,8 +29,10 @@ fi
 corepack enable
 corepack prepare pnpm@9.12.0 --activate
 
-# Install Ollama if missing
-if ! command -v ollama >/dev/null 2>&1; then
+# Check Ollama status
+if curl -s http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    echo "==> Ollama daemon already active on 127.0.0.1:11434."
+elif ! command -v ollama >/dev/null 2>&1; then
     echo "==> Installing Ollama daemon..."
     curl -fsSL https://ollama.com/install.sh | sh
 fi
@@ -76,6 +78,7 @@ echo "==> [5/8] Setting up Node.js server production dependencies..."
 
 # 6. Database and environment configuration
 echo "==> [6/8] Configuring MySQL and environment..."
+systemctl enable --now mysql
 mkdir -p /etc/gallery
 if [ ! -f /etc/gallery/gallery-web.env ]; then
     JWT_SECRET_GEN=$(head -c 32 /dev/urandom | xxd -p)
@@ -84,7 +87,7 @@ NODE_ENV="production"
 PORT="3000"
 DATABASE_URL="mysql://gallery:gallery_local_secret@127.0.0.1:3306/gallery"
 JWT_SECRET="${JWT_SECRET_GEN}"
-AI_GATEWAY_URL="http://127.0.0.1:8000"
+AI_GATEWAY_URL="http://127.0.0.1:8002"
 EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:3000"
 EXPO_PUBLIC_GALLERY_RETURN_ORIGIN="http://127.0.0.1:3000"
 GALLERY_WEB_RETURN_ORIGINS="http://127.0.0.1:3000"
@@ -106,24 +109,31 @@ mysql -e "GRANT ALL PRIVILEGES ON gallery.* TO 'gallery'@'127.0.0.1'; FLUSH PRIV
 
 # 7. Install systemd services
 echo "==> [7/8] Installing and enabling systemd daemons..."
-cp "${INSTALL_DIR}/deploy/aws/ollama.service" /etc/systemd/system/
+if ! curl -s http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    cp "${INSTALL_DIR}/deploy/aws/ollama.service" /etc/systemd/system/
+    systemctl enable --now ollama
+fi
 cp "${INSTALL_DIR}/deploy/aws/gallery-ai.service" /etc/systemd/system/
 cp "${INSTALL_DIR}/deploy/aws/gallery-web.service" /etc/systemd/system/
 
 systemctl daemon-reload
-systemctl enable --now ollama
 systemctl enable --now gallery-ai
 systemctl enable --now gallery-web
 
 # 8. Pull required Ollama models
-echo "==> [8/8] Pulling Ollama weights (llama3.2:3b, nomic-embed-text:v1.5)..."
+echo "==> [8/8] Pulling Ollama weights (llama3.2:1b/3b, nomic-embed-text:v1.5)..."
 sleep 2
-ollama pull llama3.2:3b || echo "WARNING: Failed to pull llama3.2:3b, verify network or rerun later."
-ollama pull nomic-embed-text:v1.5 || echo "WARNING: Failed to pull nomic-embed-text, verify network or rerun later."
+if command -v ollama >/dev/null 2>&1; then
+    ollama pull nomic-embed-text:v1.5 || true
+    ollama pull llama3.2:1b || true
+elif command -v docker >/dev/null 2>&1 && docker ps | grep -q ollama; then
+    docker exec ollama ollama pull nomic-embed-text:v1.5 || true
+    docker exec ollama ollama pull llama3.2:1b || true
+fi
 
 echo "=========================================================="
 echo " Gallery EC2 Backend Deployment Complete!"
 echo " Services status:"
-systemctl is-active ollama gallery-ai gallery-web
-echo " Verification: curl http://127.0.0.1:8000/health"
+systemctl is-active gallery-ai gallery-web || true
+echo " Verification: curl http://127.0.0.1:8002/health"
 echo "=========================================================="

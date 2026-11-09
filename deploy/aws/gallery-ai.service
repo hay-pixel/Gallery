@@ -1,7 +1,7 @@
 [Unit]
 Description=Gallery Private AI Service Gateway Daemon
-After=network.target ollama.service
-Wants=ollama.service
+After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
@@ -12,7 +12,7 @@ Environment="PYTHONUNBUFFERED=1"
 Environment="PATH=/opt/gallery/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/opt/gallery/.venv/bin/python services/gateway.py \
     --host 127.0.0.1 \
-    --port 8000 \
+    --port 8002 \
     --analysis-root /var/lib/gallery/analysis \
     --search-db /var/lib/gallery/search.sqlite3 \
     --ollama-host http://127.0.0.1:11434

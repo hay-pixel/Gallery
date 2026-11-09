@@ -10,7 +10,7 @@ Group=gallery
 WorkingDirectory=/opt/gallery/apps/gallery
 Environment="NODE_ENV=production"
 Environment="PORT=3000"
-Environment="AI_GATEWAY_URL=http://127.0.0.1:8000"
+Environment="AI_GATEWAY_URL=http://127.0.0.1:8002"
 EnvironmentFile=-/etc/gallery/gallery-web.env
 ExecStart=/usr/bin/node dist/index.mjs
 Restart=always
