@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CatalogueAssetView } from "../../lib/catalogue/types";
 import { formatBytes } from "../../lib/pixeldrive";
 
@@ -18,12 +19,13 @@ export type AssetDetailSheetProps = {
 };
 
 export function AssetDetailSheet({ view, onClose, onApproveReview }: AssetDetailSheetProps) {
+  const insets = useSafeAreaInsets();
   if (!view) return null;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
           <View style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
             <View style={styles.header}>

@@ -15,19 +15,19 @@ export default function HomeRoute() {
   const handleNavigate = (tab: "Images" | "Search" | "Library" | "Sources" | "Settings") => {
     switch (tab) {
       case "Images":
-        router.push("/images");
+        router.navigate("/(tabs)/images" as any);
         break;
       case "Search":
-        router.push("/search");
+        router.navigate("/(tabs)/search" as any);
         break;
       case "Library":
-        router.push("/library");
+        router.navigate("/(tabs)/library" as any);
         break;
       case "Sources":
-        router.push("/sources");
+        router.navigate("/(tabs)/sources" as any);
         break;
       case "Settings":
-        router.push("/settings");
+        router.navigate("/(tabs)/settings" as any);
         break;
     }
   };

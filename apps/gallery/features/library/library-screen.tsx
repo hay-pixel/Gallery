@@ -27,16 +27,38 @@ export function LibraryScreen({
 }: LibraryScreenProps) {
   const [filter, setFilter] = useState("All");
 
-  const categories = ["All", "Documents", "Videos", "Writing", "Photos", "Life Admin"];
+  const categories = ["All", "Photos", "Videos", "Documents", "Writing", "Life Admin", "Needs Review", "Duplicates"];
 
   const pendingCount = views.filter((v) => v.annotations.reviewState === "NEEDS_REVIEW").length;
   const duplicateCount = views.filter((v) => v.occurrences.length > 1).length;
 
   const filteredViews = useMemo(() => {
+    if (filter === "Needs Review") {
+      return views.filter((v) => v.annotations.reviewState === "NEEDS_REVIEW");
+    }
+    if (filter === "Duplicates") {
+      return views.filter((v) => v.occurrences.length > 1);
+    }
     return browseCatalogue(views, "", {
       category: filter === "All" ? undefined : filter,
     });
   }, [views, filter]);
+
+  const handleReviewsClick = () => {
+    if (onNavigateReviews) {
+      onNavigateReviews();
+    } else {
+      setFilter("Needs Review");
+    }
+  };
+
+  const handleDuplicatesClick = () => {
+    if (onNavigateDuplicates) {
+      onNavigateDuplicates();
+    } else {
+      setFilter("Duplicates");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -51,14 +73,14 @@ export function LibraryScreen({
       </View>
 
       <View style={styles.subLinks}>
-        <Pressable onPress={onNavigateReviews} style={styles.subLinkCard}>
+        <Pressable onPress={handleReviewsClick} style={styles.subLinkCard}>
           <MaterialIcons name="pending-actions" size={16} color="#F6C75B" />
           <Text style={styles.subLinkText}>
             Reviews {pendingCount > 0 ? `(${pendingCount})` : ""}
           </Text>
           <MaterialIcons name="chevron-right" size={16} color="#A8B4C8" />
         </Pressable>
-        <Pressable onPress={onNavigateDuplicates} style={styles.subLinkCard}>
+        <Pressable onPress={handleDuplicatesClick} style={styles.subLinkCard}>
           <MaterialIcons name="content-copy" size={16} color="#9A7DFF" />
           <Text style={styles.subLinkText}>
             Duplicates {duplicateCount > 0 ? `(${duplicateCount})` : ""}

@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { startOAuthLogin } from "../../constants/oauth";
 import { useCatalogue } from "../../features/catalogue/catalogue-provider";
 import { SourcesScreen } from "../../features/sources/sources-screen";
 
@@ -26,6 +27,7 @@ export default function SourcesRoute() {
             void reloadFromCache();
           }}
           onTriggerPicker={handleTriggerPicker}
+          onConnectDrive={startOAuthLogin}
         />
       </View>
     </SafeAreaView>

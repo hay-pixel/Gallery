@@ -19,6 +19,7 @@ export const APP_ID = env.appId;
 export const OWNER_OPEN_ID = env.ownerId;
 export const OWNER_NAME = env.ownerName;
 export const API_BASE_URL = env.apiBaseUrl;
+export const DEFAULT_PRODUCTION_API_URL = "https://3-24-122-192.sslip.io";
 
 /**
  * Get the API base URL, deriving from current hostname if not set.
@@ -49,9 +50,12 @@ export function getApiBaseUrl(): string {
       const apiHost = host.replace(/^8081-/, "3000-");
       if (apiHost !== host) return `https://${apiHost}`;
     }
+
+    // In standalone native APK, default to live production AWS EC2 endpoint
+    return DEFAULT_PRODUCTION_API_URL;
   }
 
-  // Fallback to empty (will use relative URL)
+  // Fallback to empty (will use relative URL on web)
   return "";
 }
 

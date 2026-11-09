@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type {
   DiscoveredSourceItem,
   SourceAccessState,
@@ -28,12 +29,13 @@ export function LocalSourceBrowser({
   onClose,
   onPickDocument,
 }: LocalSourceBrowserProps) {
+  const insets = useSafeAreaInsets();
   if (!visible) return null;
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.scrim}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
           <View style={styles.handle} />
           <View style={styles.head}>
             <View>

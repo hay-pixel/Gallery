@@ -1,9 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CatalogueProvider } from "../../features/catalogue/catalogue-provider";
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <CatalogueProvider>
       <Tabs
@@ -13,8 +16,8 @@ export default function TabLayout() {
             backgroundColor: "#080D18",
             borderTopColor: "#263554",
             borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
+            height: 56 + Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 8),
             paddingTop: 6,
           },
           tabBarActiveTintColor: "#50D4FF",
