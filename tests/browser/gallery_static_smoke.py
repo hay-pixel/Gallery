@@ -39,6 +39,13 @@ async def main():
             page.on("pageerror", lambda error: errors.append(str(error)))
             await page.goto(f"http://127.0.0.1:{server.server_address[1]}")
             await page.get_by_role("button", name="Explore a demo").wait_for()
+            await page.get_by_role(
+                "heading", name="Your library", exact=True
+            ).wait_for()
+            await page.evaluate("document.fonts.ready")
+            await page.evaluate(
+                "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))"
+            )
             Path("work").mkdir(exist_ok=True)
             await page.screenshot(path="work/gallery-empty-final.png")
             await page.get_by_role("button", name="Explore a demo").focus()
