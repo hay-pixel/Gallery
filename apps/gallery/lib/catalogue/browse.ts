@@ -1,3 +1,4 @@
+import { cloneCatalogueValue } from "./clone";
 import type { ReviewState } from "../pixeldrive";
 import type { CatalogueAssetView } from "./types";
 
@@ -9,7 +10,10 @@ export type CatalogueBrowseFilters = {
   showSidecars?: boolean;
 };
 
-export type CatalogueBrowseSort = "display_name_asc" | "size_desc" | "asset_id_asc";
+export type CatalogueBrowseSort =
+  | "display_name_asc"
+  | "size_desc"
+  | "asset_id_asc";
 
 function normaliseText(value: string): string {
   return value
@@ -30,7 +34,9 @@ function buildBrowseCorpus(view: CatalogueAssetView): string {
     view.analysis?.ocr_text ?? "",
     view.analysis?.visual_description ?? "",
     view.occurrences
-      .map((occ) => [occ.original_path, occ.source_location, occ.source_id].join(" "))
+      .map((occ) =>
+        [occ.original_path, occ.source_location, occ.source_id].join(" "),
+      )
       .join(" "),
   ];
   return normaliseText(parts.join(" "));
@@ -43,13 +49,18 @@ export function browseCatalogue(
   sort: CatalogueBrowseSort = "display_name_asc",
 ): CatalogueAssetView[] {
   const normalizedQuery = normaliseText(query);
-  const terms = normalizedQuery ? normalizedQuery.split(" ").filter(Boolean) : [];
+  const terms = normalizedQuery
+    ? normalizedQuery.split(" ").filter(Boolean)
+    : [];
 
   const matched = assets.filter((view) => {
     if (filters.showSidecars === false && view.annotations.isTechnicalSidecar) {
       return false;
     }
-    if (filters.mimePrefix && !view.asset.mime_type.startsWith(filters.mimePrefix)) {
+    if (
+      filters.mimePrefix &&
+      !view.asset.mime_type.startsWith(filters.mimePrefix)
+    ) {
       return false;
     }
     if (
@@ -65,7 +76,10 @@ export function browseCatalogue(
     ) {
       return false;
     }
-    if (filters.reviewState && view.annotations.reviewState !== filters.reviewState) {
+    if (
+      filters.reviewState &&
+      view.annotations.reviewState !== filters.reviewState
+    ) {
       return false;
     }
     if (terms.length > 0) {
@@ -75,7 +89,7 @@ export function browseCatalogue(
     return true;
   });
 
-  const cloned = matched.map((view) => structuredClone(view));
+  const cloned = matched.map((view) => cloneCatalogueValue(view));
 
   cloned.sort((a, b) => {
     if (sort === "size_desc") {

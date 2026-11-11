@@ -41,14 +41,10 @@ describe("Gallery sources and discovery UI", () => {
   it("renders SourcesScreen with canonical import trigger and read-only Drive explanation", () => {
     const snapshot = createEmptyCatalogueSnapshot();
     const markup = renderToStaticMarkup(
-      <SourcesScreen
-        snapshot={snapshot}
-        onImportSuccess={() => {}}
-      />,
+      <SourcesScreen snapshot={snapshot} onImportSuccess={() => {}} />,
     );
-    expect(markup).toContain("Connect a Google Drive");
-    expect(markup).toContain("Import canonical JSON");
-    expect(markup).toContain("read-only");
+    expect(markup).toContain("Connect Google Drive");
+    expect(markup).toContain("Import collection");
+    expect(markup).toMatch(/read-only/i);
   });
 });
-

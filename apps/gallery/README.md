@@ -31,3 +31,13 @@ See [runtime repair evidence and remaining gaps](docs/RUNTIME-REPAIR.md) for the
 source-action, imported-preview, offline-answer and filter-layout repairs. Browser regression
 checks are documented in `tests/browser/README.md` at the repository root. A new native build
 is required for document picker support; the web checks do not prove Android or AWS behavior.
+
+## Usability pass
+
+The primary tabs are Library, Search, Sources and Settings. First launch is empty; sample
+records require an explicit demo action. Existing local imports and review state are kept.
+Drive accounts and source-only previews use the signed backend routes; JSON imports remain
+canonical records in the local saved library. The main UI never treats provider IDs as asset IDs.
+
+See `docs/progress/2026-11-11-gallery-usability.md` at the repository root and the updated
+browser checks in `tests/browser/`. Live AWS/OAuth and physical-device acceptance remain separate.

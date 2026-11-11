@@ -1,3 +1,4 @@
+import { cloneCatalogueValue } from "./clone";
 import { parseAssetRecordV1, parseSourceOccurrenceRecordV1 } from "./contracts";
 import type {
   AnalysisView,
@@ -7,7 +8,10 @@ import type {
   GalleryCatalogueSnapshotV1,
 } from "./types";
 
-function defaultAnnotations(assetId: AssetId, savedAt: string): GalleryAnnotations {
+function defaultAnnotations(
+  assetId: AssetId,
+  savedAt: string,
+): GalleryAnnotations {
   return {
     asset_id: assetId,
     reviewState: "NEEDS_REVIEW",
@@ -23,7 +27,9 @@ function basenameFromPath(pathValue: string): string {
   return parts[parts.length - 1] ?? pathValue;
 }
 
-export function validateSnapshotIntegrity(snapshot: GalleryCatalogueSnapshotV1): void {
+export function validateSnapshotIntegrity(
+  snapshot: GalleryCatalogueSnapshotV1,
+): void {
   const assetIds = new Set<AssetId>();
   for (const rawAsset of snapshot.canonical_assets) {
     const asset = parseAssetRecordV1(rawAsset);
@@ -39,9 +45,13 @@ export function validateSnapshotIntegrity(snapshot: GalleryCatalogueSnapshotV1):
     }
   }
 
-  for (const [annotatedId, annotation] of Object.entries(snapshot.annotations)) {
+  for (const [annotatedId, annotation] of Object.entries(
+    snapshot.annotations,
+  )) {
     if (!assetIds.has(annotatedId) || annotation.asset_id !== annotatedId) {
-      throw new Error(`Orphan or mismatched annotation for asset_id ${annotatedId}`);
+      throw new Error(
+        `Orphan or mismatched annotation for asset_id ${annotatedId}`,
+      );
     }
   }
 
@@ -58,36 +68,47 @@ export function buildCatalogueAssetView(
 ): CatalogueAssetView {
   validateSnapshotIntegrity(snapshot);
 
-  const assetRecord = snapshot.canonical_assets.find((item) => item.asset_id === assetId);
+  const assetRecord = snapshot.canonical_assets.find(
+    (item) => item.asset_id === assetId,
+  );
   if (!assetRecord) {
     throw new Error(`Canonical asset not found: ${assetId}`);
   }
 
-  const asset = structuredClone(parseAssetRecordV1(assetRecord));
+  const asset = cloneCatalogueValue(parseAssetRecordV1(assetRecord));
   const occurrences = snapshot.source_occurrences
     .filter((occ) => occ.asset_id === assetId)
-    .map((occ) => structuredClone(parseSourceOccurrenceRecordV1(occ)));
+    .map((occ) => cloneCatalogueValue(parseSourceOccurrenceRecordV1(occ)));
 
-  const rawAnalysis = snapshot.analysis_views.find((item) => item.asset_id === assetId) ?? null;
+  const rawAnalysis =
+    snapshot.analysis_views.find((item) => item.asset_id === assetId) ?? null;
   const analysis: AnalysisView | null = rawAnalysis
     ? {
-        ...structuredClone(rawAnalysis),
-        tags: rawAnalysis.tags.map((t) => ({ ...t, source: "classifier" as const })),
+        ...cloneCatalogueValue(rawAnalysis),
+        tags: rawAnalysis.tags.map((t) => ({
+          ...t,
+          source: "classifier" as const,
+        })),
         detected_objects: rawAnalysis.detected_objects
           .filter((obj) => obj.source === "detector")
-          .map((obj) => ({ ...structuredClone(obj), source: "detector" as const })),
+          .map((obj) => ({
+            ...cloneCatalogueValue(obj),
+            source: "detector" as const,
+          })),
       }
     : null;
 
   const rawAnnotations = snapshot.annotations[assetId];
   const annotations: GalleryAnnotations = rawAnnotations
-    ? structuredClone(rawAnnotations)
+    ? cloneCatalogueValue(rawAnnotations)
     : defaultAnnotations(assetId, snapshot.saved_at);
 
   const preferredOccurrence =
     (annotations.preferredSourceOccurrenceId
       ? occurrences.find(
-          (occ) => occ.source_occurrence_id === annotations.preferredSourceOccurrenceId,
+          (occ) =>
+            occ.source_occurrence_id ===
+            annotations.preferredSourceOccurrenceId,
         )
       : undefined) ??
     occurrences[0] ??
@@ -95,7 +116,9 @@ export function buildCatalogueAssetView(
 
   const displayName =
     annotations.title ??
-    (preferredOccurrence ? basenameFromPath(preferredOccurrence.original_path) : asset.asset_id);
+    (preferredOccurrence
+      ? basenameFromPath(preferredOccurrence.original_path)
+      : asset.asset_id);
 
   return {
     asset,
@@ -103,7 +126,9 @@ export function buildCatalogueAssetView(
     analysis,
     annotations,
     displayName,
-    primaryOccurrence: preferredOccurrence ? structuredClone(preferredOccurrence) : null,
+    primaryOccurrence: preferredOccurrence
+      ? cloneCatalogueValue(preferredOccurrence)
+      : null,
   };
 }
 
@@ -115,4 +140,3 @@ export function buildAllCatalogueAssetViews(
     buildCatalogueAssetView(asset.asset_id, snapshot),
   );
 }
-

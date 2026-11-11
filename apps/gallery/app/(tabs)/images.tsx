@@ -8,7 +8,9 @@ import type { CatalogueAssetView } from "../../lib/catalogue/types";
 
 export default function ImagesRoute() {
   const { views, annotateAsset } = useCatalogue();
-  const [selectedAsset, setSelectedAsset] = useState<CatalogueAssetView | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<CatalogueAssetView | null>(
+    null,
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
@@ -27,6 +29,6 @@ export default function ImagesRoute() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#080D18" },
-  root: { flex: 1, backgroundColor: "#080D18" },
+  safe: { flex: 1, backgroundColor: "#0C1117" },
+  root: { flex: 1, backgroundColor: "#0C1117" },
 });

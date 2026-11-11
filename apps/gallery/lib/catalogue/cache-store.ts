@@ -1,3 +1,4 @@
+import { cloneCatalogueValue } from "./clone";
 import { parseAssetRecordV1, parseSourceOccurrenceRecordV1 } from "./contracts";
 import type { GalleryCatalogueSnapshotV1 } from "./types";
 import { validateSnapshotIntegrity } from "./view-model";
@@ -43,7 +44,9 @@ function parsePointer(text: string | null): CachePointer | null {
   }
 }
 
-function parseSnapshotText(text: string | null): GalleryCatalogueSnapshotV1 | null {
+function parseSnapshotText(
+  text: string | null,
+): GalleryCatalogueSnapshotV1 | null {
   if (!text) return null;
   try {
     const raw = JSON.parse(text) as Partial<GalleryCatalogueSnapshotV1>;
@@ -68,14 +71,16 @@ function parseSnapshotText(text: string | null): GalleryCatalogueSnapshotV1 | nu
       schema: "gallery-catalogue-cache",
       schema_version: 1,
       saved_at: raw.saved_at,
-      canonical_assets: raw.canonical_assets.map((item) => parseAssetRecordV1(item)),
+      canonical_assets: raw.canonical_assets.map((item) =>
+        parseAssetRecordV1(item),
+      ),
       source_occurrences: raw.source_occurrences.map((item) =>
         parseSourceOccurrenceRecordV1(item),
       ),
-      analysis_views: structuredClone(raw.analysis_views),
-      annotations: structuredClone(raw.annotations),
-      discovered_sources: structuredClone(raw.discovered_sources),
-      capability_state: structuredClone(raw.capability_state),
+      analysis_views: cloneCatalogueValue(raw.analysis_views),
+      annotations: cloneCatalogueValue(raw.annotations),
+      discovered_sources: cloneCatalogueValue(raw.discovered_sources),
+      capability_state: cloneCatalogueValue(raw.capability_state),
     };
 
     validateSnapshotIntegrity(snapshot);
@@ -188,7 +193,9 @@ export function createGalleryCacheStore(io: CacheIO): {
     currentSlot: CacheSlot | null,
   ): Promise<void> {
     validateSnapshotIntegrity(snapshot);
-    const targetSlot: CacheSlot = currentSlot ? oppositeSlot(currentSlot) : "slot-a";
+    const targetSlot: CacheSlot = currentSlot
+      ? oppositeSlot(currentSlot)
+      : "slot-a";
     const serialized = JSON.stringify(snapshot);
     await io.writeSlot(targetSlot, serialized);
 
@@ -205,20 +212,22 @@ export function createGalleryCacheStore(io: CacheIO): {
     async read(): Promise<GalleryCatalogueSnapshotV1 | null> {
       await writeQueue.catch(() => undefined);
       const { snapshot } = await readInternal();
-      return snapshot ? structuredClone(snapshot) : null;
+      return snapshot ? cloneCatalogueValue(snapshot) : null;
     },
 
     write(snapshot: GalleryCatalogueSnapshotV1): Promise<void> {
-      const cloned = structuredClone(snapshot);
+      const cloned = cloneCatalogueValue(snapshot);
       const nextOp = writeQueue
         .catch(() => undefined)
         .then(async () => {
           const pointer = parsePointer(await io.readPointer());
-          await writeSnapshotToInactiveSlot(cloned, pointer?.activeSlot ?? null);
+          await writeSnapshotToInactiveSlot(
+            cloned,
+            pointer?.activeSlot ?? null,
+          );
         });
       writeQueue = nextOp;
       return nextOp;
     },
   };
 }
-

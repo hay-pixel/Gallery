@@ -1,3 +1,4 @@
+import { cloneCatalogueValue } from "./clone";
 import {
   parseAssetRecordV1,
   parseSourceOccurrenceRecordV1,
@@ -46,13 +47,15 @@ export function mergeCanonicalImport(
 
   const assetMap = new Map<AssetId, AssetRecordV1>();
   for (const existing of snapshot.canonical_assets) {
-    assetMap.set(existing.asset_id, structuredClone(existing));
+    assetMap.set(existing.asset_id, cloneCatalogueValue(existing));
   }
 
   for (const incomingRaw of batch.assets) {
     const incoming = parseAssetRecordV1(incomingRaw);
     if (incoming.processing_state !== "ready") {
-      throw new Error(`Cannot merge non-ready canonical asset ${incoming.asset_id}`);
+      throw new Error(
+        `Cannot merge non-ready canonical asset ${incoming.asset_id}`,
+      );
     }
     const current = assetMap.get(incoming.asset_id);
     if (current) {
@@ -62,13 +65,16 @@ export function mergeCanonicalImport(
         );
       }
     } else {
-      assetMap.set(incoming.asset_id, structuredClone(incoming));
+      assetMap.set(incoming.asset_id, cloneCatalogueValue(incoming));
     }
   }
 
   const occurrenceMap = new Map<SourceOccurrenceId, SourceOccurrenceRecordV1>();
   for (const existingOcc of snapshot.source_occurrences) {
-    occurrenceMap.set(existingOcc.source_occurrence_id, structuredClone(existingOcc));
+    occurrenceMap.set(
+      existingOcc.source_occurrence_id,
+      cloneCatalogueValue(existingOcc),
+    );
   }
 
   for (const incomingOccRaw of batch.occurrences) {
@@ -86,13 +92,15 @@ export function mergeCanonicalImport(
         );
       }
     } else {
-      occurrenceMap.set(incomingOcc.source_occurrence_id, structuredClone(incomingOcc));
+      occurrenceMap.set(
+        incomingOcc.source_occurrence_id,
+        cloneCatalogueValue(incomingOcc),
+      );
     }
   }
 
-  const nextAnnotations: Record<AssetId, GalleryAnnotations> = structuredClone(
-    snapshot.annotations,
-  );
+  const nextAnnotations: Record<AssetId, GalleryAnnotations> =
+    cloneCatalogueValue(snapshot.annotations);
 
   for (const asset of batch.assets) {
     const meta = batch.metadata[asset.asset_id];
@@ -143,13 +151,12 @@ export function mergeCanonicalImport(
     source_occurrences: [...occurrenceMap.values()].sort((a, b) =>
       a.source_occurrence_id.localeCompare(b.source_occurrence_id),
     ),
-    analysis_views: structuredClone(snapshot.analysis_views),
+    analysis_views: cloneCatalogueValue(snapshot.analysis_views),
     annotations: nextAnnotations,
-    discovered_sources: structuredClone(snapshot.discovered_sources),
-    capability_state: structuredClone(snapshot.capability_state),
+    discovered_sources: cloneCatalogueValue(snapshot.discovered_sources),
+    capability_state: cloneCatalogueValue(snapshot.capability_state),
   };
 
   validateSnapshotIntegrity(nextSnapshot);
   return nextSnapshot;
 }
-

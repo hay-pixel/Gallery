@@ -1,286 +1,256 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import React, { useState } from "react";
+import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActionButton,
+  IconButton,
+  Notice,
+  ScreenHeading,
+} from "../../components/gallery/primitives";
+import { galleryTheme as t } from "../../constants/gallery-theme";
+import { hasDemoAssets } from "../../lib/catalogue/demo";
 import type { GalleryCatalogueSnapshotV1 } from "../../lib/catalogue/types";
-import { LocalSourceBrowser } from "./local-source-browser";
 
+export type DriveAccount = {
+  id: number;
+  displayName: string;
+  email: string | null;
+};
 export type SourcesScreenProps = {
   snapshot: GalleryCatalogueSnapshotV1;
   busy?: boolean;
   message?: string | null;
   error?: string | null;
+  accounts?: DriveAccount[];
+  loadingAccounts?: boolean;
+  accountsError?: boolean;
   onImportSuccess?: () => void;
   onConnectDrive?: () => void;
   onTriggerPicker?: () => void;
+  onBrowseDrive?: (id: number) => void;
+  onRefresh?: () => void;
 };
-
 export function SourcesScreen({
   snapshot,
   busy = false,
   message,
   error,
-  onImportSuccess: _onImportSuccess,
+  accounts = [],
+  loadingAccounts,
+  accountsError,
   onConnectDrive,
   onTriggerPicker,
+  onBrowseDrive,
+  onRefresh,
 }: SourcesScreenProps) {
-  const [showBrowser, setShowBrowser] = useState(false);
-
+  const importedCount = snapshot.canonical_assets.filter(
+    (asset) => !asset.storage_locator.startsWith("fixture://"),
+  ).length;
   return (
     <ScrollView
-      contentContainerStyle={styles.container}
+      style={{ flex: 1, backgroundColor: t.background }}
       showsVerticalScrollIndicator={false}
+      contentContainerStyle={s.page}
     >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Sources</Text>
-          <Text style={styles.subtitle}>
-            Keep each provider separate and read-only
+      <ScreenHeading
+        title="Sources"
+        subtitle="Bring your files together. Leave originals where they are."
+        action={
+          onRefresh ? (
+            <IconButton
+              label="Refresh sources"
+              icon="refresh"
+              onPress={onRefresh}
+            />
+          ) : undefined
+        }
+      />
+      {error ? <Notice text={error} error /> : null}
+      {message ? <Notice text={message} /> : null}
+      <View style={s.connectCard}>
+        <View style={s.driveIcon}>
+          <MaterialIcons name="add-to-drive" size={30} color={t.accent} />
+        </View>
+        <Text style={s.cardTitle}>Your Drive, in one place.</Text>
+        <Text style={s.body}>
+          Connect a Google account to browse photos, documents, and everything
+          in between.
+        </Text>
+        <ActionButton
+          label={busy ? "Please wait…" : "Connect Google Drive"}
+          icon="add"
+          onPress={onConnectDrive}
+          disabled={busy}
+        />
+        <View style={s.assurance}>
+          <MaterialIcons name="lock-outline" size={14} color={t.muted} />
+          <Text style={s.caption}>
+            Read-only access. Originals stay untouched.
           </Text>
         </View>
-        <View style={styles.iconCircle}>
-          <MaterialIcons name="storage" size={20} color="#50D4FF" />
-        </View>
       </View>
-
-      <View style={styles.explainer}>
-        <MaterialIcons name="lock" size={18} color="#56D49A" />
-        <Text style={styles.explainerText}>
-          You can link multiple Google Drives, local archives, and Extract
-          exports. Each remains a separate, read-only source with independent
-          provenance.
+      <View style={s.sectionHeader}>
+        <Text role="heading" aria-level={2} style={s.sectionTitle}>
+          Connected accounts
         </Text>
+        <Text style={s.caption}>{accountsError ? "—" : accounts.length}</Text>
       </View>
-
-      {error ? (
-        <Text
-          accessibilityRole="alert"
-          style={{ color: "#FF7E7E", fontSize: 14, lineHeight: 20 }}
-        >
-          {error}
-        </Text>
+      {loadingAccounts ? (
+        <Text style={s.body}>Checking your connections…</Text>
       ) : null}
-      {message ? (
-        <Text
-          accessibilityLiveRegion="polite"
-          style={{ color: "#56D49A", fontSize: 14, lineHeight: 20 }}
-        >
-          {message}
-        </Text>
+      {accountsError ? (
+        <Notice text="Couldn't load your connections. Your saved library is still available. Check your backend connection and refresh." />
       ) : null}
-      {busy ? <Text style={styles.subtitle}>Working…</Text> : null}
-      <Text style={styles.sectionTitle}>On this device</Text>
-
-      <View style={styles.sourceItem}>
-        <View style={styles.sourceGlyph}>
-          <MaterialIcons name="folder-shared" size={20} color="#50D4FF" />
-        </View>
-        <View style={styles.sourceInfo}>
-          <Text style={styles.sourceName}>Saved library</Text>
-          <Text style={styles.sourceSub}>
-            {snapshot.canonical_assets.length} canonical assets ·{" "}
-            {snapshot.source_occurrences.length} occurrences
-          </Text>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>
-              {snapshot.canonical_assets.some((asset) =>
-                asset.storage_locator.startsWith("fixture://"),
-              )
-                ? "Includes sample records"
-                : "Local catalogue"}
+      {accounts.map((account) => (
+        <Pressable
+          key={account.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Browse ${account.displayName}`}
+          onPress={() => onBrowseDrive?.(account.id)}
+          style={({ pressed }) => [s.account, pressed && { opacity: 0.65 }]}
+        >
+          <View style={s.accountIcon}>
+            <MaterialIcons name="cloud-done" size={23} color={t.accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={s.accountName}>
+              {account.displayName}
+            </Text>
+            <Text numberOfLines={1} style={s.caption}>
+              {account.email || "Google Drive"} · read-only
             </Text>
           </View>
+          <MaterialIcons name="chevron-right" size={22} color={t.muted} />
+        </Pressable>
+      ))}
+      {!accounts.length && !loadingAccounts && !accountsError ? (
+        <View style={s.noAccounts}>
+          <Text style={s.body}>No accounts connected yet.</Text>
+          <Text style={s.caption}>
+            You can connect more than one Google account.
+          </Text>
+        </View>
+      ) : null}
+      <Text
+        role="heading"
+        aria-level={2}
+        style={[s.sectionTitle, { marginTop: 30, marginBottom: 14 }]}
+      >
+        On this device
+      </Text>
+      <View style={s.saved}>
+        <MaterialIcons name="folder-open" size={25} color={t.muted} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.accountName}>Saved library</Text>
+          <Text style={s.caption}>
+            {importedCount} imported {importedCount === 1 ? "file" : "files"}
+            {hasDemoAssets(snapshot) ? " · includes demo data" : ""}
+          </Text>
         </View>
       </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={onConnectDrive}
-        style={styles.actionCard}
-      >
-        <View style={styles.plus}>
-          <MaterialIcons name="add" size={20} color="#080D18" />
-        </View>
-        <View style={styles.actionInfo}>
-          <Text style={styles.actionTitle}>Connect a Google Drive</Text>
-          <Text style={styles.actionSub}>
-            Choose an account or shared Drive to view read-only.
-          </Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color="#50D4FF" />
-      </Pressable>
-
-      <Pressable onPress={() => setShowBrowser(true)} style={styles.actionCard}>
-        <View style={[styles.plus, { backgroundColor: "#56D49A" }]}>
-          <MaterialIcons name="smartphone" size={20} color="#080D18" />
-        </View>
-        <View style={styles.actionInfo}>
-          <Text style={[styles.actionTitle, { color: "#56D49A" }]}>
-            Browse local device
-          </Text>
-          <Text style={styles.actionSub}>
-            Discover photos and files on this device.
-          </Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color="#56D49A" />
-      </Pressable>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={onTriggerPicker}
-        style={styles.actionCard}
-      >
-        <View style={[styles.plus, { backgroundColor: "#9A7DFF" }]}>
-          <MaterialIcons name="file-download" size={20} color="#080D18" />
-        </View>
-        <View style={styles.actionInfo}>
-          <Text style={[styles.actionTitle, { color: "#9A7DFF" }]}>
-            Import canonical JSON
-          </Text>
-          <Text style={styles.actionSub}>
-            Atomically merge an Extract export or asset bundle.
-          </Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color="#9A7DFF" />
-      </Pressable>
-
-      <LocalSourceBrowser
-        visible={showBrowser}
-        accessState="unavailable"
-        items={snapshot.discovered_sources}
-        onClose={() => setShowBrowser(false)}
-        onPickDocument={() => onTriggerPicker?.()}
-      />
+      <View style={s.importCard}>
+        <Text style={s.accountName}>Already have a collection?</Text>
+        <Text style={s.body}>
+          Import a Gallery collection (.json) with file records and previews.
+          Your saved notes and review decisions are kept.
+        </Text>
+        <ActionButton
+          label="Import collection"
+          secondary
+          icon="file-upload"
+          onPress={onTriggerPicker}
+          disabled={busy}
+        />
+      </View>
+      <Text style={s.footer}>
+        Files stay under your control. Removing a connection never changes an
+        original.
+      </Text>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 18,
-    gap: 16,
-    paddingBottom: 32,
-    backgroundColor: "#080D18",
+const s = StyleSheet.create({
+  page: {
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
-  header: {
+  connectCard: {
+    padding: 22,
+    backgroundColor: t.surface,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: t.border,
+    gap: 18,
+  },
+  driveIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: "#223C37",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTitle: {
+    color: t.text,
+    fontSize: 25,
+    fontWeight: "500",
+    letterSpacing: -0.7,
+  },
+  body: { color: t.muted, fontSize: 14, lineHeight: 22 },
+  caption: { color: t.muted, fontSize: 12, lineHeight: 19 },
+  assurance: {
+    flexDirection: "row",
+    gap: 7,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 30,
+    marginBottom: 14,
   },
-  title: {
-    color: "#F4F7FB",
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.4,
+  sectionTitle: { color: t.text, fontSize: 16, fontWeight: "600" },
+  account: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "center",
+    minHeight: 82,
+    borderBottomWidth: 1,
+    borderColor: t.border,
+    paddingVertical: 12,
   },
-  subtitle: {
-    color: "#A8B4C8",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#50D4FF17",
+  accountIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: t.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  explainer: {
+  accountName: {
+    color: t.text,
+    fontSize: 15,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  noAccounts: { paddingVertical: 6, gap: 5 },
+  saved: {
     flexDirection: "row",
-    gap: 10,
-    backgroundColor: "#56D49A15",
-    borderWidth: 1,
-    borderColor: "#56D49A4D",
-    borderRadius: 12,
-    padding: 12,
-  },
-  explainerText: {
-    color: "#56D49A",
-    fontSize: 11,
-    lineHeight: 16,
-    flex: 1,
-  },
-  sectionTitle: {
-    color: "#F4F7FB",
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  sourceItem: {
-    flexDirection: "row",
-    gap: 12,
-    backgroundColor: "#11192C",
-    borderWidth: 1,
-    borderColor: "#263554",
-    borderRadius: 12,
-    padding: 12,
+    gap: 14,
     alignItems: "center",
+    marginBottom: 18,
   },
-  sourceGlyph: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#17233B",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sourceInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  sourceName: {
-    color: "#F4F7FB",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  sourceSub: {
-    color: "#A8B4C8",
-    fontSize: 11,
-  },
-  pill: {
-    alignSelf: "flex-start",
-    backgroundColor: "#50D4FF1A",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginTop: 2,
-  },
-  pillText: {
-    color: "#50D4FF",
-    fontSize: 9,
-    fontWeight: "700",
-  },
-  actionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#50D4FF66",
-    borderRadius: 12,
-    padding: 12,
-  },
-  plus: {
-    width: 36,
-    height: 36,
+  importCard: {
+    padding: 18,
     borderRadius: 18,
-    backgroundColor: "#50D4FF",
-    alignItems: "center",
-    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: t.border,
+    gap: 12,
   },
-  actionInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  actionTitle: {
-    color: "#50D4FF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  actionSub: {
-    color: "#A8B4C8",
-    fontSize: 11,
-  },
+  footer: { color: t.muted, fontSize: 12, lineHeight: 20, marginTop: 24 },
 });

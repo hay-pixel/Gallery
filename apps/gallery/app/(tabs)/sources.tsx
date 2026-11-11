@@ -1,9 +1,11 @@
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCatalogue } from "../../features/catalogue/catalogue-provider";
+import { galleryTheme as t } from "../../constants/gallery-theme";
+import { DriveBrowser } from "../../features/sources/drive-browser";
 import { SourcesScreen } from "../../features/sources/sources-screen";
 import { createCanonicalImportPicker } from "../../lib/catalogue/native-import-picker";
 import { pickCanonicalImport } from "../../lib/catalogue/pick-import";
@@ -15,6 +17,34 @@ export default function SourcesRoute() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessionChecking, setSessionChecking] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<number | null>(null);
+  const utils = trpc.useUtils();
+  useEffect(() => {
+    let active = true;
+    void getGallerySessionToken()
+      .then((token) => {
+        if (active) setSessionReady(Boolean(token));
+      })
+      .catch(() => {
+        if (active) setSessionReady(false);
+      })
+      .finally(() => {
+        if (active) setSessionChecking(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const accounts = trpc.googleDrive.list.useQuery(undefined, {
+    enabled: sessionReady,
+    retry: false,
+  });
+  const driveFiles = trpc.googleDrive.sourceFiles.useQuery(
+    { sourceId: selectedSource ?? 1 },
+    { enabled: sessionReady && selectedSource !== null, retry: false },
+  );
   const beginConnect = trpc.googleDrive.beginConnect.useMutation();
 
   const handleTriggerPicker = async () => {
@@ -26,7 +56,7 @@ export default function SourcesRoute() {
       if (!batch) return;
       await importCanonicalBatch(batch);
       setMessage(
-        `Imported ${batch.assets.length} asset record${batch.assets.length === 1 ? "" : "s"}. Your library is saved on this device.`,
+        `Imported ${batch.assets.length} file record${batch.assets.length === 1 ? "" : "s"}. Your library is saved on this device.`,
       );
     } catch (err) {
       setError(
@@ -45,6 +75,7 @@ export default function SourcesRoute() {
     setMessage(null);
     try {
       const token = await getGallerySessionToken();
+      setSessionReady(Boolean(token));
       if (!token)
         throw new Error(
           "Cannot reach Gallery. Check your backend connection and try again.",
@@ -67,6 +98,7 @@ export default function SourcesRoute() {
         returnUri,
       );
       if (result.type === "success") {
+        await utils.googleDrive.list.invalidate();
         const status = new URL(result.url).searchParams.get("drive");
         if (status === "connected")
           setMessage(
@@ -92,6 +124,19 @@ export default function SourcesRoute() {
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <View style={styles.root}>
         <SourcesScreen
+          accounts={accounts.data ?? []}
+          loadingAccounts={accounts.isFetching || sessionChecking}
+          accountsError={
+            accounts.isError || (!sessionReady && !sessionChecking)
+          }
+          onRefresh={() => {
+            if (sessionReady) void accounts.refetch();
+            else
+              void getGallerySessionToken().then((token) =>
+                setSessionReady(Boolean(token)),
+              );
+          }}
+          onBrowseDrive={setSelectedSource}
           snapshot={snapshot}
           busy={busy}
           message={message}
@@ -103,11 +148,26 @@ export default function SourcesRoute() {
             void connectDrive();
           }}
         />
+        <DriveBrowser
+          key={selectedSource ?? "none"}
+          visible={selectedSource !== null}
+          title={
+            accounts.data?.find((source) => source.id === selectedSource)
+              ?.displayName ?? "Google Drive"
+          }
+          files={driveFiles.data ?? []}
+          loading={driveFiles.isFetching}
+          error={driveFiles.isError}
+          onClose={() => setSelectedSource(null)}
+          onRetry={() => {
+            void driveFiles.refetch();
+          }}
+        />
       </View>
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#080D18" },
-  root: { flex: 1, backgroundColor: "#080D18" },
+  safe: { flex: 1, backgroundColor: t.background },
+  root: { flex: 1, backgroundColor: t.background },
 });

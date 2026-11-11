@@ -1,223 +1,144 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React, { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { COMPANION_TARGETS, deriveCompanionState } from "../../lib/launcher/companion";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { IconButton, ScreenHeading } from "../../components/gallery/primitives";
+import { galleryTheme as t } from "../../constants/gallery-theme";
 import type { GalleryCatalogueSnapshotV1 } from "../../lib/catalogue/types";
 import { OllamaSettingsScreen } from "./ollama-settings-screen";
-
 export type SettingsScreenProps = {
   snapshot: GalleryCatalogueSnapshotV1;
+  backendState?: "connected" | "offline" | "checking";
+  aiReachable?: boolean;
 };
-
-export function SettingsScreen({ snapshot }: SettingsScreenProps) {
-  const [showOllamaDetails, setShowOllamaDetails] = useState(false);
-
-  const extractCompanion = deriveCompanionState({
-    target: COMPANION_TARGETS.extract,
-    installed: false,
-  });
-
-  const assistCompanion = deriveCompanionState({
-    target: COMPANION_TARGETS.assist,
-    installed: false,
-  });
-
-  if (showOllamaDetails) {
+export function SettingsScreen({
+  snapshot,
+  backendState = "offline",
+  aiReachable = false,
+}: SettingsScreenProps) {
+  const [showAI, setShowAI] = useState(false);
+  if (showAI)
     return (
-      <View style={styles.subScreen}>
-        <Pressable onPress={() => setShowOllamaDetails(false)} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={20} color="#50D4FF" />
-          <Text style={styles.backText}>Back to Settings</Text>
-        </Pressable>
+      <View style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 20, paddingTop: 8 }}>
+          <IconButton
+            label="Back to settings"
+            icon="arrow-back"
+            onPress={() => setShowAI(false)}
+          />
+        </View>
         <OllamaSettingsScreen
           health={{
-            state: snapshot.capability_state.ollama === "ready" ? "ready" : "unavailable",
+            state: aiReachable ? "ready" : "unavailable",
             defaultModel: null,
-            detail: "Private Ollama reasoning daemon is managed server-side.",
+            detail: aiReachable
+              ? "Your backend reports a reachable private AI service."
+              : "Your backend has not reported a reachable private AI service.",
           }}
           models={[]}
         />
       </View>
     );
-  }
-
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Runtime independence and companion status</Text>
+    <ScrollView
+      style={{ backgroundColor: t.background }}
+      contentContainerStyle={s.page}
+    >
+      <ScreenHeading
+        title="Settings"
+        subtitle="A little clarity about your library."
+      />
+      <Text style={s.section}>Connections</Text>
+      <View style={s.card}>
+        <View style={s.row}>
+          <MaterialIcons name="cloud-queue" size={23} color={t.accent} />
+          <Text style={s.label}>Gallery backend</Text>
+          <Text
+            style={[
+              s.status,
+              { color: backendState === "connected" ? t.accent : t.muted },
+            ]}
+          >
+            {backendState === "checking"
+              ? "Checking…"
+              : backendState === "connected"
+                ? "Connected"
+                : "Offline"}
+          </Text>
         </View>
-        <View style={styles.iconCircle}>
-          <MaterialIcons name="settings" size={20} color="#50D4FF" />
-        </View>
+        <Text style={s.body}>
+          Your saved library stays available on this device when the backend is
+          offline.
+        </Text>
       </View>
-
-      <Text style={styles.sectionTitle}>Companions</Text>
-      <View style={styles.companionCard}>
-        <MaterialIcons name="extension" size={20} color="#50D4FF" />
-        <View style={styles.companionInfo}>
-          <Text style={styles.companionName}>{extractCompanion.displayName}</Text>
-          <Text style={styles.companionStatus}>State: {extractCompanion.state}</Text>
-          <Text style={styles.companionDetail}>{extractCompanion.detail}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => setShowAI(true)}
+        style={s.card}
+      >
+        <View style={s.row}>
+          <MaterialIcons name="auto-awesome" size={23} color={t.accent} />
+          <Text style={s.label}>Private AI</Text>
+          <MaterialIcons name="chevron-right" size={22} color={t.muted} />
         </View>
-      </View>
-
-      <View style={styles.companionCard}>
-        <MaterialIcons name="support-agent" size={20} color="#9A7DFF" />
-        <View style={styles.companionInfo}>
-          <Text style={styles.companionName}>{assistCompanion.displayName}</Text>
-          <Text style={styles.companionStatus}>State: {assistCompanion.state}</Text>
-          <Text style={styles.companionDetail}>{assistCompanion.detail}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>Private AI & Reasoning</Text>
-      <Pressable onPress={() => setShowOllamaDetails(true)} style={styles.menuRow}>
-        <MaterialIcons name="psychology" size={22} color="#50D4FF" />
-        <View style={styles.menuInfo}>
-          <Text style={styles.menuTitle}>Private Ollama Status</Text>
-          <Text style={styles.menuSub}>State: {snapshot.capability_state.ollama}</Text>
-        </View>
-        <MaterialIcons name="chevron-right" size={20} color="#A8B4C8" />
+        <Text style={s.body}>
+          {aiReachable
+            ? "Available for questions about your files."
+            : "Optional. Local file search works without it."}
+        </Text>
       </Pressable>
-
-      <Text style={styles.sectionTitle}>Catalogue Status</Text>
-      <View style={styles.infoCard}>
-        <Text style={styles.infoLine}>Schema: {snapshot.schema} (v{snapshot.schema_version})</Text>
-        <Text style={styles.infoLine}>Saved at: {snapshot.saved_at}</Text>
-        <Text style={styles.infoLine}>Canonical assets: {snapshot.canonical_assets.length}</Text>
-        <Text style={styles.infoLine}>Source occurrences: {snapshot.source_occurrences.length}</Text>
+      <Text style={s.section}>On this device</Text>
+      <View style={s.card}>
+        <View style={s.row}>
+          <Text style={s.label}>Saved files</Text>
+          <Text style={s.value}>{snapshot.canonical_assets.length}</Text>
+        </View>
+        <View style={s.divider} />
+        <Text style={s.body}>
+          Imports and review decisions are saved here. Cross-device recovery is
+          not set up yet.
+        </Text>
       </View>
+      <Text style={s.section}>Your originals stay yours</Text>
+      <View style={s.card}>
+        <MaterialIcons name="lock-outline" size={25} color={t.accent} />
+        <Text style={s.body}>
+          Gallery reads connected sources. Organizing your library never
+          renames, moves, or deletes the original files.
+        </Text>
+      </View>
+      <Text style={s.footer}>Gallery · A home for your files.</Text>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 18,
-    gap: 16,
-    paddingBottom: 32,
-    backgroundColor: "#080D18",
+const s = StyleSheet.create({
+  page: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    width: "100%",
+    maxWidth: 720,
+    alignSelf: "center",
+    gap: 14,
   },
-  subScreen: {
-    flex: 1,
-    backgroundColor: "#080D18",
-  },
-  backBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backText: {
-    color: "#50D4FF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  title: {
-    color: "#F4F7FB",
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.4,
-  },
-  subtitle: {
-    color: "#A8B4C8",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#50D4FF17",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sectionTitle: {
-    color: "#F4F7FB",
-    fontSize: 14,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  companionCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    backgroundColor: "#11192C",
-    borderColor: "#263554",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-  },
-  companionInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  companionName: {
-    color: "#F4F7FB",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  companionStatus: {
-    color: "#50D4FF",
-    fontSize: 11,
+  section: {
+    color: t.text,
+    fontSize: 15,
     fontWeight: "600",
-    textTransform: "capitalize",
+    marginTop: 12,
+    marginBottom: 1,
   },
-  companionDetail: {
-    color: "#A8B4C8",
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  menuRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#11192C",
-    borderColor: "#263554",
+  card: {
+    backgroundColor: t.surface,
+    borderRadius: 18,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
+    borderColor: t.border,
+    padding: 18,
+    gap: 14,
   },
-  menuInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  menuTitle: {
-    color: "#F4F7FB",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  menuSub: {
-    color: "#A8B4C8",
-    fontSize: 11,
-    textTransform: "capitalize",
-  },
-  infoCard: {
-    backgroundColor: "#11192C",
-    borderColor: "#263554",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
-  },
-  infoLine: {
-    color: "#A8B4C8",
-    fontSize: 11,
-  },
+  row: { flexDirection: "row", gap: 12, alignItems: "center", minHeight: 30 },
+  label: { color: t.text, fontSize: 15, flex: 1, minWidth: 0 },
+  status: { fontSize: 12 },
+  value: { color: t.accent, fontSize: 18, fontWeight: "600" },
+  body: { color: t.muted, fontSize: 14, lineHeight: 23 },
+  divider: { height: 1, backgroundColor: t.border },
+  footer: { color: t.muted, fontSize: 12, marginTop: 20, textAlign: "center" },
 });
-

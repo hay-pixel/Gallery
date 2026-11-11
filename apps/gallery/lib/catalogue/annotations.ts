@@ -1,4 +1,9 @@
-import type { AssetId, GalleryAnnotations, GalleryCatalogueSnapshotV1 } from "./types";
+import { cloneCatalogueValue } from "./clone";
+import type {
+  AssetId,
+  GalleryAnnotations,
+  GalleryCatalogueSnapshotV1,
+} from "./types";
 
 export type GalleryAnnotationPatch = Partial<
   Omit<GalleryAnnotations, "asset_id" | "updated_at">
@@ -10,7 +15,9 @@ export function applyGalleryAnnotation(
   patch: GalleryAnnotationPatch,
   now: string = new Date().toISOString(),
 ): GalleryCatalogueSnapshotV1 {
-  const exists = snapshot.canonical_assets.some((asset) => asset.asset_id === assetId);
+  const exists = snapshot.canonical_assets.some(
+    (asset) => asset.asset_id === assetId,
+  );
   if (!exists) {
     throw new Error(`Cannot annotate unknown canonical asset: ${assetId}`);
   }
@@ -37,8 +44,8 @@ export function applyGalleryAnnotation(
   }
 
   const nextAnnotation: GalleryAnnotations = {
-    ...structuredClone(existing),
-    ...structuredClone(patch),
+    ...cloneCatalogueValue(existing),
+    ...cloneCatalogueValue(patch),
     asset_id: assetId,
     updated_at: now,
   };
@@ -46,15 +53,14 @@ export function applyGalleryAnnotation(
   return {
     ...snapshot,
     saved_at: now,
-    canonical_assets: structuredClone(snapshot.canonical_assets),
-    source_occurrences: structuredClone(snapshot.source_occurrences),
-    analysis_views: structuredClone(snapshot.analysis_views),
-    discovered_sources: structuredClone(snapshot.discovered_sources),
-    capability_state: structuredClone(snapshot.capability_state),
+    canonical_assets: cloneCatalogueValue(snapshot.canonical_assets),
+    source_occurrences: cloneCatalogueValue(snapshot.source_occurrences),
+    analysis_views: cloneCatalogueValue(snapshot.analysis_views),
+    discovered_sources: cloneCatalogueValue(snapshot.discovered_sources),
+    capability_state: cloneCatalogueValue(snapshot.capability_state),
     annotations: {
-      ...structuredClone(snapshot.annotations),
+      ...cloneCatalogueValue(snapshot.annotations),
       [assetId]: nextAnnotation,
     },
   };
 }
-

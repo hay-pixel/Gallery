@@ -1,4 +1,6 @@
 import "@/global.css";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useFonts } from "expo-font";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -23,6 +25,8 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  // Register bundled icon fonts before both static rendering and client hydration.
+  const [fontsLoaded, fontError] = useFonts(MaterialIcons.font);
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
@@ -44,7 +48,10 @@ export default function RootLayout() {
 
   // Ensure minimum 8px padding for top and bottom on mobile
   const providerInitialMetrics = useMemo(() => {
-    const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
+    const metrics = initialWindowMetrics ?? {
+      insets: initialInsets,
+      frame: initialFrame,
+    };
     return {
       ...metrics,
       insets: {
@@ -64,17 +71,21 @@ export default function RootLayout() {
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="oauth/callback" />
+            <Stack.Screen name="oauth/drive" />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style="light" />
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>
   );
 
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+        {content}
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }

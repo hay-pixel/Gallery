@@ -1,3 +1,4 @@
+import { cloneCatalogueValue } from "../catalogue/clone";
 import type {
   DiscoveredSourceItem,
   DocumentPickerAdapter,
@@ -8,7 +9,9 @@ import type {
   SourceDiscoveryPage,
 } from "./types";
 
-function deriveMediaAccessState(perm: MediaLibraryPermissionResponse): SourceAccessState {
+function deriveMediaAccessState(
+  perm: MediaLibraryPermissionResponse,
+): SourceAccessState {
   if (perm.status !== "granted") {
     return "denied";
   }
@@ -54,7 +57,9 @@ export async function discoverLocalMediaSources(
 
   const endCursor = page.endCursor ?? null;
   const cursorDidNotAdvance = Boolean(after && endCursor === after);
-  const hasNextPage = Boolean(page.hasNextPage && endCursor && !cursorDidNotAdvance);
+  const hasNextPage = Boolean(
+    page.hasNextPage && endCursor && !cursorDidNotAdvance,
+  );
 
   const items: DiscoveredSourceItem[] = page.assets.map((asset) => ({
     discoveryHandle: `local_media:${asset.id}`,
@@ -122,14 +127,13 @@ export async function verifySourceHandleAccess(
   try {
     const readable = await probe.canReadUri(item.uri);
     return {
-      ...structuredClone(item),
+      ...cloneCatalogueValue(item),
       accessState: readable ? item.accessState : "revoked",
     };
   } catch {
     return {
-      ...structuredClone(item),
+      ...cloneCatalogueValue(item),
       accessState: "revoked",
     };
   }
 }
-

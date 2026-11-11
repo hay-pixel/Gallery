@@ -1,101 +1,119 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { galleryTheme as t } from "../../constants/gallery-theme";
 import type { CatalogueAssetView } from "../../lib/catalogue/types";
-import { AssetPreview } from "./asset-preview";
 import { formatBytes } from "../../lib/pixeldrive";
+import { AssetPreview } from "./asset-preview";
 
-export type AssetCardProps = {
+export function AssetCard({
+  view,
+  onPress,
+  layout = "list",
+}: {
   view: CatalogueAssetView;
   onPress?: () => void;
-};
-
-export function AssetCard({ view, onPress }: AssetCardProps) {
-  const isImage = view.asset.mime_type.startsWith("image/");
-  const isVideo = view.asset.mime_type.startsWith("video/");
-  const iconName: keyof typeof MaterialIcons.glyphMap = isImage
-    ? "photo"
-    : isVideo
-      ? "videocam"
-      : "description";
-
+  layout?: "list" | "grid";
+}) {
+  const image = view.asset.mime_type.startsWith("image/");
+  const video = view.asset.mime_type.startsWith("video/");
+  const icon = image ? "image" : video ? "play-circle-outline" : "description";
+  const grid = layout === "grid";
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${view.displayName}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        s.card,
+        grid && s.gridCard,
+        pressed && { opacity: 0.75 },
+      ]}
     >
-      <View
-        style={[
-          styles.thumbnail,
-          { backgroundColor: view.annotations.previewColor ?? "#2F80ED" },
-        ]}
-      >
-        <MaterialIcons name={iconName} size={24} color="#FFFFFF" />
+      <View style={grid ? s.gridVisual : s.visual}>
+        <View style={s.placeholder}>
+          <MaterialIcons name={icon} size={grid ? 32 : 24} color={t.muted} />
+          {grid ? (
+            <Text style={s.noPreview}>
+              {image ? "Image" : video ? "Video" : "Document"}
+            </Text>
+          ) : null}
+        </View>
         <AssetPreview view={view} />
-      </View>
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
-          {view.displayName}
-        </Text>
-        <Text style={styles.meta}>
-          {view.annotations.category ?? "Archive"} ·{" "}
-          {formatBytes(view.asset.size_bytes)}
-        </Text>
-        {view.occurrences.length > 1 ? (
-          <Text style={styles.occurrences}>
-            {view.occurrences.length} source occurrences
-          </Text>
+        {view.annotations.reviewState === "NEEDS_REVIEW" ? (
+          <View style={s.reviewDot} accessibilityLabel="Needs review" />
         ) : null}
       </View>
-      {view.annotations.reviewState === "NEEDS_REVIEW" ? (
-        <MaterialIcons name="pending-actions" size={18} color="#F6C75B" />
-      ) : (
-        <MaterialIcons name="chevron-right" size={18} color="#A8B4C8" />
-      )}
+      <View style={[s.info, grid && s.gridInfo]}>
+        <Text style={s.name} numberOfLines={1}>
+          {view.displayName}
+        </Text>
+        <Text style={s.meta} numberOfLines={1}>
+          {formatBytes(view.asset.size_bytes)}
+          {view.occurrences.length > 1
+            ? ` · ${view.occurrences.length} copies`
+            : ""}
+        </Text>
+      </View>
+      {!grid ? (
+        <MaterialIcons name="chevron-right" size={20} color={t.muted} />
+      ) : null}
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#11192C",
-    borderColor: "#263554",
+    gap: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: t.border,
+    minHeight: 84,
+  },
+  gridCard: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    paddingVertical: 0,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    marginVertical: 4,
-  },
-  pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.99 }],
-  },
-  thumbnail: {
+    borderRadius: 16,
     overflow: "hidden",
-    width: 46,
-    height: 46,
-    borderRadius: 10,
+    backgroundColor: t.surface,
+    gap: 0,
+  },
+  visual: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: t.raised,
+  },
+  gridVisual: {
+    width: "100%",
+    aspectRatio: 1.16,
+    overflow: "hidden",
+    backgroundColor: t.raised,
+  },
+  placeholder: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    color: "#F4F7FB",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  meta: {
-    color: "#A8B4C8",
-    fontSize: 11,
-  },
-  occurrences: {
-    color: "#50D4FF",
-    fontSize: 10,
-    fontWeight: "600",
+  noPreview: { color: t.muted, fontSize: 12 },
+  info: { flex: 1, minWidth: 0, gap: 5 },
+  gridInfo: { padding: 12, flex: undefined, minHeight: 65 },
+  name: { color: t.text, fontSize: 14, fontWeight: "500" },
+  meta: { color: t.muted, fontSize: 12, lineHeight: 18 },
+  reviewDot: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: t.warning,
+    borderColor: t.surface,
+    borderWidth: 2,
   },
 });

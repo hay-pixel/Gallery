@@ -1,7 +1,8 @@
 # Runtime repair checkpoint — 2026-11-11
 
-Based on origin/main d6fc270, isolated on repair/gallery-runtime. No merge, push, AWS change,
-or deployment was performed. This is a targeted repair, not a completed product redesign.
+Based on origin/main d6fc270, preserved as repair commit edb97c1 on repair/gallery-runtime.
+No merge, AWS change or application deployment was performed. The follow-up usability pass
+is documented in docs/progress/2026-11-11-gallery-usability.md at the repository root. This is a targeted repair, not a completed product redesign.
 
 ## Reproduced baseline
 

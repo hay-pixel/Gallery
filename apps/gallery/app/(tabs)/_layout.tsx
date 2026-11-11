@@ -2,47 +2,41 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
 import React from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { galleryTheme as t } from "../../constants/gallery-theme";
 import { CatalogueProvider } from "../../features/catalogue/catalogue-provider";
-
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-
   return (
     <CatalogueProvider>
       <Tabs
         screenOptions={{
           headerShown: false,
+          sceneStyle: { backgroundColor: t.background },
           tabBarStyle: {
-            backgroundColor: "#080D18",
-            borderTopColor: "#263554",
+            backgroundColor: t.background,
+            borderTopColor: t.border,
             borderTopWidth: 1,
-            height: 56 + Math.max(insets.bottom, 12),
+            height: 62 + Math.max(insets.bottom, 8),
             paddingBottom: Math.max(insets.bottom, 8),
-            paddingTop: 6,
+            paddingTop: 8,
           },
-          tabBarActiveTintColor: "#50D4FF",
-          tabBarInactiveTintColor: "#A8B4C8",
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "700",
-          },
+          tabBarActiveTintColor: t.accent,
+          tabBarInactiveTintColor: t.muted,
+          tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
-            title: "Home",
+            title: "Library",
+            tabBarAccessibilityLabel: "Library",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="home" color={color} size={size ?? 22} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="images"
-          options={{
-            title: "Images",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="image" color={color} size={size ?? 22} />
+              <MaterialIcons
+                aria-hidden
+                name="photo-library"
+                color={color}
+                size={size ?? 23}
+              />
             ),
           }}
         />
@@ -50,17 +44,14 @@ export default function TabLayout() {
           name="search"
           options={{
             title: "Search",
+            tabBarAccessibilityLabel: "Search",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="search" color={color} size={size ?? 22} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="library"
-          options={{
-            title: "Library",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="folder" color={color} size={size ?? 22} />
+              <MaterialIcons
+                aria-hidden
+                name="search"
+                color={color}
+                size={size ?? 23}
+              />
             ),
           }}
         />
@@ -68,8 +59,14 @@ export default function TabLayout() {
           name="sources"
           options={{
             title: "Sources",
+            tabBarAccessibilityLabel: "Sources",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="storage" color={color} size={size ?? 22} />
+              <MaterialIcons
+                aria-hidden
+                name="folder-open"
+                color={color}
+                size={size ?? 23}
+              />
             ),
           }}
         />
@@ -77,10 +74,21 @@ export default function TabLayout() {
           name="settings"
           options={{
             title: "Settings",
+            tabBarAccessibilityLabel: "Settings",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="settings" color={color} size={size ?? 22} />
+              <MaterialIcons
+                aria-hidden
+                name="tune"
+                color={color}
+                size={size ?? 23}
+              />
             ),
           }}
+        />
+        <Tabs.Screen name="images" options={{ href: null, title: "Images" }} />
+        <Tabs.Screen
+          name="library"
+          options={{ href: null, title: "Library" }}
         />
       </Tabs>
     </CatalogueProvider>

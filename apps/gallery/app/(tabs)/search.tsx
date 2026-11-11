@@ -1,32 +1,40 @@
 import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AssetDetailSheet } from "../../components/catalogue/asset-detail-sheet";
+import { Notice } from "../../components/gallery/primitives";
+import { galleryTheme as t } from "../../constants/gallery-theme";
 import { useCatalogue } from "../../features/catalogue/catalogue-provider";
 import { SearchScreen } from "../../features/search/search-screen";
-import type { CatalogueAssetView } from "../../lib/catalogue/types";
-
+import { trpc } from "../../lib/trpc";
 export default function SearchRoute() {
-  const { views, annotateAsset } = useCatalogue();
-  const [selectedAsset, setSelectedAsset] = useState<CatalogueAssetView | null>(null);
-
+  const { views, annotateAsset, error } = useCatalogue();
+  const ask = trpc.ai.askArchive.useMutation();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      <View style={styles.root}>
-        <SearchScreen views={views} onSelectAsset={setSelectedAsset} />
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: t.background }}
+      edges={["top", "left", "right"]}
+    >
+      <View style={{ flex: 1 }}>
+        {error ? <Notice error text={error} /> : null}
+        <SearchScreen
+          views={views}
+          onSelectAsset={(view) => setSelectedId(view.asset.asset_id)}
+          onAsk={(question) => ask.mutateAsync({ question })}
+        />
         <AssetDetailSheet
-          view={selectedAsset}
-          onClose={() => setSelectedAsset(null)}
+          view={
+            views.find((view) => view.asset.asset_id === selectedId) ?? null
+          }
+          onClose={() => setSelectedId(null)}
           onApproveReview={(id) => {
-            void annotateAsset(id, { reviewState: "APPROVED" });
+            void annotateAsset(id, { reviewState: "APPROVED" }).catch(
+              () => undefined,
+            );
           }}
         />
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#080D18" },
-  root: { flex: 1, backgroundColor: "#080D18" },
-});

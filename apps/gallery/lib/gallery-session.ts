@@ -18,7 +18,6 @@ export const getGallerySessionToken = async (): Promise<string | null> => {
   pendingSessionPromise = (async () => {
     try {
       const baseUrl = getApiBaseUrl();
-      if (!baseUrl) return null;
 
       const response = await fetch(`${baseUrl}/api/trpc/session.create`, {
         method: "POST",

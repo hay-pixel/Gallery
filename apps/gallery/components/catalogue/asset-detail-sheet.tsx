@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   Pressable,
@@ -9,252 +9,216 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActionButton, IconButton } from "../gallery/primitives";
+import { galleryTheme as t } from "../../constants/gallery-theme";
 import type { CatalogueAssetView } from "../../lib/catalogue/types";
 import { formatBytes } from "../../lib/pixeldrive";
-
+import { AssetPreview } from "./asset-preview";
 export type AssetDetailSheetProps = {
   view: CatalogueAssetView | null;
   onClose: () => void;
   onApproveReview?: (assetId: string) => void;
 };
-
-export function AssetDetailSheet({ view, onClose, onApproveReview }: AssetDetailSheetProps) {
+export function AssetDetailSheet({
+  view,
+  onClose,
+  onApproveReview,
+}: AssetDetailSheetProps) {
   const insets = useSafeAreaInsets();
+  const [details, setDetails] = useState(false);
   if (!view) return null;
-
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.scrim}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
-          <View style={styles.handle} />
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-            <View style={styles.header}>
-              <View
-                style={[
-                  styles.visual,
-                  { backgroundColor: view.annotations.previewColor ?? "#2F80ED" },
-                ]}
-              >
-                <MaterialIcons name="image" size={36} color="#FFFFFF" />
-              </View>
-              <Text style={styles.title}>{view.displayName}</Text>
-              <Text style={styles.subtitle}>
-                {view.asset.mime_type} · {formatBytes(view.asset.size_bytes)}
+      <View style={s.scrim}>
+        <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 18) }]}>
+          <View style={s.topbar}>
+            <Text style={s.topbarText}>File preview</Text>
+            <IconButton
+              label="Close file preview"
+              icon="close"
+              onPress={onClose}
+            />
+          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ gap: 22, paddingBottom: 8 }}
+          >
+            <View style={s.visual}>
+              <MaterialIcons
+                name={
+                  view.asset.mime_type.startsWith("image/")
+                    ? "image"
+                    : "description"
+                }
+                size={40}
+                color={t.muted}
+              />
+              <AssetPreview view={view} />
+            </View>
+            <View>
+              <Text accessibilityRole="header" selectable style={s.title}>
+                {view.displayName}
               </Text>
-              <Text style={styles.assetId} numberOfLines={1}>
-                {view.asset.asset_id}
+              <Text style={s.meta}>
+                {formatBytes(view.asset.size_bytes)} ·{" "}
+                {view.annotations.category || view.asset.mime_type}
               </Text>
             </View>
-
-            {view.annotations.reviewState === "NEEDS_REVIEW" && onApproveReview ? (
-              <View style={styles.reviewPrompt}>
-                <Text style={styles.reviewLabel}>Suggested category: {view.annotations.category}</Text>
-                <Pressable
+            {view.annotations.reviewState === "NEEDS_REVIEW" &&
+            onApproveReview ? (
+              <View style={s.review}>
+                <Text style={s.body}>
+                  Suggested category: {view.annotations.category || "Unsorted"}
+                </Text>
+                <ActionButton
+                  label="Approve category"
+                  icon="check"
                   onPress={() => onApproveReview(view.asset.asset_id)}
-                  style={styles.approveBtn}
-                >
-                  <MaterialIcons name="check" size={16} color="#080D18" />
-                  <Text style={styles.approveText}>Approve Category</Text>
-                </Pressable>
+                />
+              </View>
+            ) : view.annotations.reviewState === "APPROVED" ? (
+              <Text style={s.approved}>✓ Reviewed</Text>
+            ) : null}
+            {view.analysis?.visual_description ||
+            view.analysis?.ocr_text ||
+            view.annotations.userNotes ? (
+              <View style={{ gap: 8 }}>
+                <Text style={s.section}>About this file</Text>
+                <Text selectable style={s.body}>
+                  {view.annotations.userNotes ||
+                    view.analysis?.visual_description ||
+                    view.analysis?.ocr_text}
+                </Text>
               </View>
             ) : null}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Observation & Description</Text>
-              <Text style={styles.sectionText}>
-                {view.analysis?.visual_description ||
-                  view.analysis?.ocr_text ||
-                  view.annotations.userNotes ||
-                  "No stored description available for this record."}
-              </Text>
-            </View>
-
-            {view.analysis?.tags && view.analysis.tags.length > 0 ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Tags (Classifier)</Text>
-                <View style={styles.tagWrap}>
-                  {view.analysis.tags.map((t, idx) => (
-                    <View key={`${t.tag}-${idx}`} style={styles.tagChip}>
-                      <Text style={styles.tagText}>{t.tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
-                Source Occurrences ({view.occurrences.length})
-              </Text>
-              {view.occurrences.map((occ) => (
-                <View key={occ.source_occurrence_id} style={styles.occRow}>
-                  <MaterialIcons name="folder-open" size={16} color="#50D4FF" />
-                  <View style={styles.occInfo}>
-                    <Text style={styles.occPath}>{occ.original_path}</Text>
-                    <Text style={styles.occLoc}>
-                      {occ.source_kind} · {occ.source_location}
-                    </Text>
+            {view.analysis?.tags.length ? (
+              <View style={s.tags}>
+                {view.analysis.tags.map((tag) => (
+                  <View key={tag.tag} style={s.tag}>
+                    <Text style={s.tagText}>{tag.tag}</Text>
                   </View>
-                </View>
-              ))}
-            </View>
-
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>Close</Text>
+                ))}
+              </View>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: details }}
+              onPress={() => setDetails(!details)}
+              style={s.detailsButton}
+            >
+              <Text style={s.section}>File details</Text>
+              <MaterialIcons
+                name={details ? "expand-less" : "expand-more"}
+                size={24}
+                color={t.muted}
+              />
             </Pressable>
+            {details ? (
+              <View style={{ gap: 16 }}>
+                <Text selectable style={s.hash}>
+                  {view.asset.asset_id}
+                </Text>
+                <Text style={s.body}>
+                  {view.occurrences.length} saved{" "}
+                  {view.occurrences.length === 1 ? "location" : "locations"}
+                </Text>
+                {view.occurrences.map((occurrence) => (
+                  <View
+                    key={occurrence.source_occurrence_id}
+                    style={s.occurrence}
+                  >
+                    <MaterialIcons
+                      name="folder-open"
+                      size={20}
+                      color={t.accent}
+                    />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text selectable style={s.body}>
+                        {occurrence.original_path}
+                      </Text>
+                      <Text selectable style={s.meta}>
+                        {occurrence.source_location}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {view.asset.storage_locator.startsWith("fixture://") ? (
+                  <Text style={s.meta}>
+                    This is a demo record, not a connected file.
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
           </ScrollView>
         </View>
       </View>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "flex-end",
-  },
+const s = StyleSheet.create({
+  scrim: { flex: 1, backgroundColor: "#000000AD", justifyContent: "flex-end" },
   sheet: {
-    backgroundColor: "#11192C",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: "#263554",
-    maxHeight: "85%",
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 28,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#263554",
-    borderRadius: 2,
+    width: "100%",
+    maxWidth: 680,
     alignSelf: "center",
-    marginBottom: 16,
+    backgroundColor: t.surface,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    maxHeight: "93%",
+    paddingHorizontal: 22,
+    borderWidth: 1,
+    borderColor: t.border,
   },
-  content: {
-    gap: 16,
-  },
-  header: {
+  topbar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 6,
+    minHeight: 66,
   },
+  topbarText: { color: t.muted, fontSize: 13 },
   visual: {
-    width: 72,
-    height: 72,
+    width: "100%",
+    aspectRatio: 1.4,
+    backgroundColor: t.raised,
     borderRadius: 16,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
-    color: "#F4F7FB",
-    fontSize: 16,
-    fontWeight: "800",
-    textAlign: "center",
+    color: t.text,
+    fontSize: 22,
+    fontWeight: "500",
+    lineHeight: 29,
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    color: "#A8B4C8",
-    fontSize: 12,
-  },
-  assetId: {
-    color: "#50D4FF",
-    fontSize: 10,
-    fontFamily: "monospace",
-    maxWidth: "90%",
-  },
-  reviewPrompt: {
-    backgroundColor: "#F6C75B1F",
-    borderWidth: 1,
-    borderColor: "#F6C75B50",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    gap: 8,
-  },
-  reviewLabel: {
-    color: "#F6C75B",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  approveBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#56D49A",
+  meta: { color: t.muted, fontSize: 13, lineHeight: 21, marginTop: 5 },
+  body: { color: t.text, fontSize: 14, lineHeight: 23 },
+  section: { color: t.text, fontSize: 15, fontWeight: "600" },
+  review: { backgroundColor: t.raised, borderRadius: 14, padding: 16, gap: 12 },
+  approved: { color: t.accent, fontSize: 14 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tag: {
+    backgroundColor: t.raised,
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 7,
   },
-  approveText: {
-    color: "#080D18",
-    fontSize: 12,
-    fontWeight: "800",
+  tagText: { color: t.muted, fontSize: 12 },
+  detailsButton: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderColor: t.border,
+    paddingTop: 8,
   },
-  section: {
-    backgroundColor: "#17233B",
-    borderRadius: 12,
-    padding: 12,
-    gap: 6,
-  },
-  sectionTitle: {
-    color: "#A8B4C8",
+  hash: {
+    color: t.muted,
     fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  sectionText: {
-    color: "#F4F7FB",
-    fontSize: 12,
+    fontFamily: "monospace",
     lineHeight: 18,
   },
-  tagWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  tagChip: {
-    backgroundColor: "#263554",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  tagText: {
-    color: "#50D4FF",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  occRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  occInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  occPath: {
-    color: "#F4F7FB",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  occLoc: {
-    color: "#A8B4C8",
-    fontSize: 10,
-  },
-  closeBtn: {
-    backgroundColor: "#263554",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  closeText: {
-    color: "#F4F7FB",
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  occurrence: { flexDirection: "row", gap: 12 },
 });
-

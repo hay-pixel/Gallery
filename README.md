@@ -4,7 +4,24 @@ Standalone universal file library: authorized sources, unified catalogue, browse
 
 ## Current status
 
-The Expo/React Native + Node app, read-only Google Drive OAuth, canonical catalogue domain (import, atomic merge, two-slot offline cache, local source discovery, session isolation, companion launcher), image-v1 Analysis, visual/metadata/semantic/hybrid Search (`services/search`), Analysis→Search bridge, private Ollama service adapter (`services/ollama`), universal source ingestion engine (`services/ingest.py`), and localhost AI Gateway (`services/gateway.py`) are implemented and tested. Live production AWS infrastructure provisioning and physical device release verification remain pending.
+The Expo/React Native client and Node API contain read-only Drive OAuth/session ownership,
+a local canonical catalogue and offline cache, collection import, review decisions, and
+Search/AI boundaries. Python Analysis, visual/metadata/semantic/hybrid Search, private Ollama
+adapters, ingestion and the localhost AI Gateway have fixture-backed tests. End-to-end server
+catalogue synchronization, native device-media integration, deployed OAuth/inference and
+restart persistence still need acceptance; a build or fixture test does not establish them.
+The user reports an existing AWS Ubuntu backend, whose live deployment has not been verified
+from this Cloud workspace.
+
+## Usability checkpoint
+
+The client now starts with an empty library and offers explicitly labelled demo data. Four
+primary tabs (Library, Search, Sources, Settings) replace the dashboard. Library grid/list,
+local search, collection import, review persistence and connected Drive source previews are
+wired through the existing boundaries. Drive previews remain separate from canonical imports.
+See [the usability checkpoint](docs/progress/2026-11-11-gallery-usability.md) for scope and
+remaining acceptance. The user reports an AWS Ubuntu backend; this Cloud checkout has not
+verified its live deployment or native device behavior.
 
 ## Layout
 

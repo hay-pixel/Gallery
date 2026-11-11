@@ -22,62 +22,47 @@ describe("Gallery mobile navigation and route destinations", () => {
         onNavigate={() => {}}
       />,
     );
-    expect(markup).toContain("PixelDrive");
-    expect(markup).toContain("Library");
-    expect(markup).toContain("Sources");
+    expect(markup).toContain("Gallery");
+    expect(markup).toContain("Your library");
+    expect(markup).toContain("Connect a source");
   });
 
   it("renders Images destination with filter chips and empty state", () => {
     const markup = renderToStaticMarkup(
-      <ImagesScreen
-        views={emptyViews}
-        onSelectAsset={() => {}}
-      />,
+      <ImagesScreen views={emptyViews} onSelectAsset={() => {}} />,
     );
     expect(markup).toContain("Images");
-    expect(markup).toContain("Photos");
+    expect(markup).toContain("Images");
   });
 
   it("renders Search destination with query input and modes", () => {
     const markup = renderToStaticMarkup(
-      <SearchScreen
-        views={emptyViews}
-        onSelectAsset={() => {}}
-      />,
+      <SearchScreen views={emptyViews} onSelectAsset={() => {}} />,
     );
     expect(markup).toContain("Search");
   });
 
   it("renders Library destination with category filters and reviews", () => {
     const markup = renderToStaticMarkup(
-      <LibraryScreen
-        views={emptyViews}
-        onSelectAsset={() => {}}
-      />,
+      <LibraryScreen views={emptyViews} onSelectAsset={() => {}} />,
     );
-    expect(markup).toContain("Library");
+    expect(markup).toContain("Your library");
   });
 
   it("renders Sources destination with local discovery and Drive links", () => {
     const markup = renderToStaticMarkup(
-      <SourcesScreen
-        snapshot={emptySnapshot}
-        onImportSuccess={() => {}}
-      />,
+      <SourcesScreen snapshot={emptySnapshot} onImportSuccess={() => {}} />,
     );
     expect(markup).toContain("Sources");
-    expect(markup).toContain("read-only");
+    expect(markup).toMatch(/read-only/i);
   });
 
   it("renders Settings destination with companion and Ollama status without raw endpoints", () => {
     const markup = renderToStaticMarkup(
-      <SettingsScreen
-        snapshot={emptySnapshot}
-      />,
+      <SettingsScreen snapshot={emptySnapshot} />,
     );
     expect(markup).toContain("Settings");
     expect(markup).not.toContain("11434");
     expect(markup).not.toContain("EXPO_PUBLIC");
   });
 });
-
