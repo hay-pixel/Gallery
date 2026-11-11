@@ -1,17 +1,14 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React, { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { GalleryCatalogueSnapshotV1 } from "../../lib/catalogue/types";
 import { LocalSourceBrowser } from "./local-source-browser";
 
 export type SourcesScreenProps = {
   snapshot: GalleryCatalogueSnapshotV1;
+  busy?: boolean;
+  message?: string | null;
+  error?: string | null;
   onImportSuccess?: () => void;
   onConnectDrive?: () => void;
   onTriggerPicker?: () => void;
@@ -19,6 +16,9 @@ export type SourcesScreenProps = {
 
 export function SourcesScreen({
   snapshot,
+  busy = false,
+  message,
+  error,
   onImportSuccess: _onImportSuccess,
   onConnectDrive,
   onTriggerPicker,
@@ -26,11 +26,16 @@ export function SourcesScreen({
   const [showBrowser, setShowBrowser] = useState(false);
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Sources</Text>
-          <Text style={styles.subtitle}>Keep each provider separate and read-only</Text>
+          <Text style={styles.subtitle}>
+            Keep each provider separate and read-only
+          </Text>
         </View>
         <View style={styles.iconCircle}>
           <MaterialIcons name="storage" size={20} color="#50D4FF" />
@@ -40,34 +45,67 @@ export function SourcesScreen({
       <View style={styles.explainer}>
         <MaterialIcons name="lock" size={18} color="#56D49A" />
         <Text style={styles.explainerText}>
-          You can link multiple Google Drives, local archives, and Extract exports. Each remains a separate, read-only source with independent provenance.
+          You can link multiple Google Drives, local archives, and Extract
+          exports. Each remains a separate, read-only source with independent
+          provenance.
         </Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Connected Sources</Text>
+      {error ? (
+        <Text
+          accessibilityRole="alert"
+          style={{ color: "#FF7E7E", fontSize: 14, lineHeight: 20 }}
+        >
+          {error}
+        </Text>
+      ) : null}
+      {message ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={{ color: "#56D49A", fontSize: 14, lineHeight: 20 }}
+        >
+          {message}
+        </Text>
+      ) : null}
+      {busy ? <Text style={styles.subtitle}>Working…</Text> : null}
+      <Text style={styles.sectionTitle}>On this device</Text>
 
       <View style={styles.sourceItem}>
         <View style={styles.sourceGlyph}>
           <MaterialIcons name="folder-shared" size={20} color="#50D4FF" />
         </View>
         <View style={styles.sourceInfo}>
-          <Text style={styles.sourceName}>Canonical Archive</Text>
+          <Text style={styles.sourceName}>Saved library</Text>
           <Text style={styles.sourceSub}>
-            {snapshot.canonical_assets.length} canonical assets · {snapshot.source_occurrences.length} occurrences
+            {snapshot.canonical_assets.length} canonical assets ·{" "}
+            {snapshot.source_occurrences.length} occurrences
           </Text>
           <View style={styles.pill}>
-            <Text style={styles.pillText}>Connected read-only</Text>
+            <Text style={styles.pillText}>
+              {snapshot.canonical_assets.some((asset) =>
+                asset.storage_locator.startsWith("fixture://"),
+              )
+                ? "Includes sample records"
+                : "Local catalogue"}
+            </Text>
           </View>
         </View>
       </View>
 
-      <Pressable onPress={onConnectDrive} style={styles.actionCard}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={onConnectDrive}
+        style={styles.actionCard}
+      >
         <View style={styles.plus}>
           <MaterialIcons name="add" size={20} color="#080D18" />
         </View>
         <View style={styles.actionInfo}>
           <Text style={styles.actionTitle}>Connect a Google Drive</Text>
-          <Text style={styles.actionSub}>Choose an account or shared Drive to view read-only.</Text>
+          <Text style={styles.actionSub}>
+            Choose an account or shared Drive to view read-only.
+          </Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="#50D4FF" />
       </Pressable>
@@ -77,26 +115,39 @@ export function SourcesScreen({
           <MaterialIcons name="smartphone" size={20} color="#080D18" />
         </View>
         <View style={styles.actionInfo}>
-          <Text style={[styles.actionTitle, { color: "#56D49A" }]}>Browse local device</Text>
-          <Text style={styles.actionSub}>Discover photos and files on this device.</Text>
+          <Text style={[styles.actionTitle, { color: "#56D49A" }]}>
+            Browse local device
+          </Text>
+          <Text style={styles.actionSub}>
+            Discover photos and files on this device.
+          </Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="#56D49A" />
       </Pressable>
 
-      <Pressable onPress={onTriggerPicker} style={styles.actionCard}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={onTriggerPicker}
+        style={styles.actionCard}
+      >
         <View style={[styles.plus, { backgroundColor: "#9A7DFF" }]}>
           <MaterialIcons name="file-download" size={20} color="#080D18" />
         </View>
         <View style={styles.actionInfo}>
-          <Text style={[styles.actionTitle, { color: "#9A7DFF" }]}>Import canonical JSON</Text>
-          <Text style={styles.actionSub}>Atomically merge an Extract export or asset bundle.</Text>
+          <Text style={[styles.actionTitle, { color: "#9A7DFF" }]}>
+            Import canonical JSON
+          </Text>
+          <Text style={styles.actionSub}>
+            Atomically merge an Extract export or asset bundle.
+          </Text>
         </View>
         <MaterialIcons name="chevron-right" size={20} color="#9A7DFF" />
       </Pressable>
 
       <LocalSourceBrowser
         visible={showBrowser}
-        accessState="granted"
+        accessState="unavailable"
         items={snapshot.discovered_sources}
         onClose={() => setShowBrowser(false)}
         onPickDocument={() => onTriggerPicker?.()}
@@ -233,4 +284,3 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 });
-

@@ -27,9 +27,20 @@ export function LibraryScreen({
 }: LibraryScreenProps) {
   const [filter, setFilter] = useState("All");
 
-  const categories = ["All", "Photos", "Videos", "Documents", "Writing", "Life Admin", "Needs Review", "Duplicates"];
+  const categories = [
+    "All",
+    "Photos",
+    "Videos",
+    "Documents",
+    "Writing",
+    "Life Admin",
+    "Needs Review",
+    "Duplicates",
+  ];
 
-  const pendingCount = views.filter((v) => v.annotations.reviewState === "NEEDS_REVIEW").length;
+  const pendingCount = views.filter(
+    (v) => v.annotations.reviewState === "NEEDS_REVIEW",
+  ).length;
   const duplicateCount = views.filter((v) => v.occurrences.length > 1).length;
 
   const filteredViews = useMemo(() => {
@@ -65,7 +76,9 @@ export function LibraryScreen({
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Library</Text>
-          <Text style={styles.subtitle}>Every asset in your canonical catalogue</Text>
+          <Text style={styles.subtitle}>
+            Every asset in your canonical catalogue
+          </Text>
         </View>
         <View style={styles.iconCircle}>
           <MaterialIcons name="folder" size={20} color="#50D4FF" />
@@ -91,6 +104,7 @@ export function LibraryScreen({
 
       <ScrollView
         horizontal
+        style={styles.filterStrip}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
       >
@@ -98,9 +112,17 @@ export function LibraryScreen({
           <Pressable
             key={cat}
             onPress={() => setFilter(cat)}
-            style={[styles.filterChip, filter === cat && styles.filterChipActive]}
+            style={[
+              styles.filterChip,
+              filter === cat && styles.filterChipActive,
+            ]}
           >
-            <Text style={[styles.filterText, filter === cat && styles.filterTextActive]}>
+            <Text
+              style={[
+                styles.filterText,
+                filter === cat && styles.filterTextActive,
+              ]}
+            >
               {cat}
             </Text>
           </Pressable>
@@ -118,7 +140,9 @@ export function LibraryScreen({
           <View style={styles.empty}>
             <MaterialIcons name="folder-open" size={32} color="#A8B4C8" />
             <Text style={styles.emptyTitle}>No files in this category</Text>
-            <Text style={styles.emptySub}>Select &apos;All&apos; to view your full library.</Text>
+            <Text style={styles.emptySub}>
+              Select &apos;All&apos; to view your full library.
+            </Text>
           </View>
         }
       />
@@ -180,12 +204,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
   },
+  filterStrip: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   filterRow: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 8,
     paddingVertical: 12,
   },
   filterChip: {
+    minHeight: 44,
+    justifyContent: "center",
     backgroundColor: "#11192C",
     borderColor: "#263554",
     borderWidth: 1,

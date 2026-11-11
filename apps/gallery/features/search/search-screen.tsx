@@ -13,7 +13,7 @@ import {
 import { AssetCard } from "../../components/catalogue/asset-card";
 import { browseCatalogue } from "../../lib/catalogue/browse";
 import type { CatalogueAssetView } from "../../lib/catalogue/types";
-import { FIXTURE_FILES, askArchive as localAskArchive } from "../../lib/pixeldrive";
+import { offlineArchiveAnswer } from "../../lib/search/offline-answer";
 import { trpc } from "../../lib/trpc";
 
 export type SearchScreenProps = {
@@ -22,6 +22,7 @@ export type SearchScreenProps = {
 };
 
 type AIResult = {
+  offline?: boolean;
   answer: string;
   supporting_assets?: { asset_id: string }[];
   limitations?: string[];
@@ -49,7 +50,14 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
     askMutation = null;
   }
 
-  const categories = ["All", "Photos", "Videos", "Documents", "Writing", "Memes"];
+  const categories = [
+    "All",
+    "Photos",
+    "Videos",
+    "Documents",
+    "Writing",
+    "Memes",
+  ];
 
   const results = useMemo(() => {
     return browseCatalogue(views, query, {
@@ -88,20 +96,7 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
       }
       throw new Error("tRPC client unavailable");
     } catch {
-      // Offline fallback: grounded synthesis from catalogue fixture records
-      try {
-        const local = localAskArchive(FIXTURE_FILES, q);
-        setAiResult({
-          answer: local.answer,
-          supporting_assets: local.citations.map((id) => ({ asset_id: id })),
-          limitations: ["Generated via offline local synthesis."],
-        });
-      } catch {
-        setAiResult({
-          answer: "Unable to process archive query at this time. Deterministic search remains active.",
-          limitations: ["Network unavailable and local synthesis failed."],
-        });
-      }
+      setAiResult(offlineArchiveAnswer(views, q));
     } finally {
       setIsAsking(false);
     }
@@ -111,20 +106,29 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
     <View style={styles.container}>
       <Text style={styles.title}>Search</Text>
       <Text style={styles.subtitle}>
-        Start with catalogue browse. Ask the archive when you need broader synthesis.
+        Start with catalogue browse. Ask the archive when you need broader
+        synthesis.
       </Text>
 
       <View style={styles.modeToggle}>
         <Pressable
           onPress={() => setMode("Browse")}
-          style={[styles.toggleBtn, mode === "Browse" && styles.toggleBtnActive]}
+          style={[
+            styles.toggleBtn,
+            mode === "Browse" && styles.toggleBtnActive,
+          ]}
         >
           <MaterialIcons
             name="list"
             size={16}
             color={mode === "Browse" ? "#50D4FF" : "#A8B4C8"}
           />
-          <Text style={[styles.toggleText, mode === "Browse" && styles.toggleTextActive]}>
+          <Text
+            style={[
+              styles.toggleText,
+              mode === "Browse" && styles.toggleTextActive,
+            ]}
+          >
             Catalogue browse
           </Text>
         </Pressable>
@@ -137,7 +141,12 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
             size={15}
             color={mode === "Ask" ? "#50D4FF" : "#A8B4C8"}
           />
-          <Text style={[styles.toggleText, mode === "Ask" && styles.toggleTextActive]}>
+          <Text
+            style={[
+              styles.toggleText,
+              mode === "Ask" && styles.toggleTextActive,
+            ]}
+          >
             Ask AI
           </Text>
         </Pressable>
@@ -197,6 +206,7 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
         <>
           <ScrollView
             horizontal
+            style={styles.filterStrip}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterRow}
           >
@@ -204,7 +214,10 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
               <Pressable
                 key={cat}
                 onPress={() => setFilter(cat)}
-                style={[styles.filterChip, filter === cat && styles.filterChipActive]}
+                style={[
+                  styles.filterChip,
+                  filter === cat && styles.filterChipActive,
+                ]}
               >
                 <Text
                   style={[
@@ -254,7 +267,11 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
                     onPress={() => void handleAsk(prompt)}
                     style={styles.promptChip}
                   >
-                    <MaterialIcons name="chat-bubble-outline" size={14} color="#50D4FF" />
+                    <MaterialIcons
+                      name="chat-bubble-outline"
+                      size={14}
+                      color="#50D4FF"
+                    />
                     <Text style={styles.promptText}>{prompt}</Text>
                   </Pressable>
                 ))}
@@ -266,9 +283,12 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
           {isAsking ? (
             <View style={styles.thinkingCard}>
               <ActivityIndicator size="large" color="#50D4FF" />
-              <Text style={styles.thinkingTitle}>Consulting Ollama Archive Assistant</Text>
+              <Text style={styles.thinkingTitle}>
+                Consulting Ollama Archive Assistant
+              </Text>
               <Text style={styles.thinkingSub}>
-                Reasoning over local catalogue metadata, OCR transcripts, and visual descriptions...
+                Reasoning over local catalogue metadata, OCR transcripts, and
+                visual descriptions...
               </Text>
             </View>
           ) : null}
@@ -278,8 +298,16 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
             <View style={styles.aiResultCard}>
               <View style={styles.aiCardHeader}>
                 <View style={styles.aiBadge}>
-                  <MaterialIcons name="auto-awesome" size={16} color="#50D4FF" />
-                  <Text style={styles.aiBadgeText}>Archive Synthesis</Text>
+                  <MaterialIcons
+                    name="auto-awesome"
+                    size={16}
+                    color="#50D4FF"
+                  />
+                  <Text style={styles.aiBadgeText}>
+                    {aiResult.offline
+                      ? "Local catalogue matches"
+                      : "Archive Synthesis"}
+                  </Text>
                 </View>
                 <Pressable
                   onPress={() => {
@@ -296,7 +324,11 @@ export function SearchScreen({ views, onSelectAsset }: SearchScreenProps) {
 
               {aiResult.limitations && aiResult.limitations.length > 0 ? (
                 <View style={styles.limitationsBox}>
-                  <MaterialIcons name="info-outline" size={14} color="#A8B4C8" />
+                  <MaterialIcons
+                    name="info-outline"
+                    size={14}
+                    color="#A8B4C8"
+                  />
                   <Text style={styles.limitationsText}>
                     {aiResult.limitations.join("; ")}
                   </Text>
@@ -417,12 +449,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#263554",
     opacity: 0.6,
   },
+  filterStrip: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   filterRow: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 8,
     paddingVertical: 10,
   },
   filterChip: {
+    minHeight: 44,
+    justifyContent: "center",
     backgroundColor: "#11192C",
     borderColor: "#263554",
     borderWidth: 1,

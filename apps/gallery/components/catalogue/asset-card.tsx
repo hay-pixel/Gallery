@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { CatalogueAssetView } from "../../lib/catalogue/types";
+import { AssetPreview } from "./asset-preview";
 import { formatBytes } from "../../lib/pixeldrive";
 
 export type AssetCardProps = {
@@ -30,13 +31,15 @@ export function AssetCard({ view, onPress }: AssetCardProps) {
         ]}
       >
         <MaterialIcons name={iconName} size={24} color="#FFFFFF" />
+        <AssetPreview view={view} />
       </View>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {view.displayName}
         </Text>
         <Text style={styles.meta}>
-          {view.annotations.category ?? "Archive"} · {formatBytes(view.asset.size_bytes)}
+          {view.annotations.category ?? "Archive"} ·{" "}
+          {formatBytes(view.asset.size_bytes)}
         </Text>
         {view.occurrences.length > 1 ? (
           <Text style={styles.occurrences}>
@@ -70,6 +73,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   thumbnail: {
+    overflow: "hidden",
     width: 46,
     height: 46,
     borderRadius: 10,
@@ -95,4 +99,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

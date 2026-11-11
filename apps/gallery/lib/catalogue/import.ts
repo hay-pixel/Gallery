@@ -13,7 +13,10 @@ export const MAX_PREVIEW_DATA_URI_BYTES = 256 * 1024;
 
 const SafePreviewDataUriSchema = z
   .string()
-  .max(MAX_PREVIEW_DATA_URI_BYTES, "previewDataUri exceeds bounded data URI limit")
+  .max(
+    MAX_PREVIEW_DATA_URI_BYTES,
+    "previewDataUri exceeds bounded data URI limit",
+  )
   .regex(
     /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/,
     "previewDataUri must be a bounded base64 data:image/ URI; remote/filesystem preview URLs are forbidden",
@@ -33,7 +36,9 @@ export const CanonicalImportMetadataItemSchema = z
   })
   .strict();
 
-export type CanonicalImportMetadataItem = z.infer<typeof CanonicalImportMetadataItemSchema>;
+export type CanonicalImportMetadataItem = z.infer<
+  typeof CanonicalImportMetadataItemSchema
+>;
 
 const CanonicalImportEnvelopeSchema = z
   .object({
@@ -56,7 +61,23 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
     throw new Error("Canonical import payload must be a non-empty JSON string");
   }
 
-  const byteLength = Buffer.byteLength(text, "utf8");
+  // Client runtimes do not provide Node's Buffer. Count UTF-8 including surrogate pairs.
+  let byteLength = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) byteLength++;
+    else if (code < 0x800) byteLength += 2;
+    else if (
+      code >= 0xd800 &&
+      code <= 0xdbff &&
+      i + 1 < text.length &&
+      text.charCodeAt(i + 1) >= 0xdc00 &&
+      text.charCodeAt(i + 1) <= 0xdfff
+    ) {
+      byteLength += 4;
+      i++;
+    } else byteLength += 3;
+  }
   if (byteLength > MAX_IMPORT_BYTES) {
     throw new Error(
       `Canonical import payload exceeds maximum allowed size (${byteLength} > ${MAX_IMPORT_BYTES} bytes)`,
@@ -80,7 +101,9 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
   const schemaVersion = (raw as { schema_version?: unknown }).schema_version;
 
   if (schemaVersion !== 1) {
-    throw new Error(`Unsupported canonical import schema_version: ${String(schemaVersion)}`);
+    throw new Error(
+      `Unsupported canonical import schema_version: ${String(schemaVersion)}`,
+    );
   }
 
   if (schemaName === "asset-record") {
@@ -98,7 +121,9 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
   }
 
   if (schemaName !== "gallery-canonical-import") {
-    throw new Error(`Unsupported canonical import schema: ${String(schemaName)}`);
+    throw new Error(
+      `Unsupported canonical import schema: ${String(schemaName)}`,
+    );
   }
 
   const parsedEnvelope = CanonicalImportEnvelopeSchema.parse(raw);
@@ -111,7 +136,9 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
       );
     }
     if (seenAssetIds.has(asset.asset_id)) {
-      throw new Error(`Duplicate asset_id in canonical import batch: ${asset.asset_id}`);
+      throw new Error(
+        `Duplicate asset_id in canonical import batch: ${asset.asset_id}`,
+      );
     }
     seenAssetIds.add(asset.asset_id);
   }
@@ -134,7 +161,9 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
   const metadataMap: Record<AssetId, CanonicalImportMetadataItem> = {};
   for (const meta of parsedEnvelope.metadata) {
     if (!seenAssetIds.has(meta.asset_id)) {
-      throw new Error(`Orphan metadata entry references unknown asset_id ${meta.asset_id}`);
+      throw new Error(
+        `Orphan metadata entry references unknown asset_id ${meta.asset_id}`,
+      );
     }
     if (metadataMap[meta.asset_id]) {
       throw new Error(`Duplicate metadata entry for asset_id ${meta.asset_id}`);
@@ -148,4 +177,3 @@ export function parseCanonicalImport(text: string): CanonicalImportBatch {
     metadata: metadataMap,
   };
 }
-

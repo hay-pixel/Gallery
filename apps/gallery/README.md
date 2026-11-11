@@ -24,3 +24,10 @@ Set `DATABASE_URL`, `GALLERY_WEB_RETURN_ORIGINS` (comma-separated exact Gallery 
 Analysis and Search are optional capabilities with explicit availability states. Deterministic catalogue browsing/search works while Analysis, Search similarity, or Ollama is unavailable. Current sample data is an adapter/evaluation catalogue; wiring the filesystem ingest record reader and permanent Search/Analysis HTTP contracts remains integration work.
 
 Production uses `dist/index.mjs` and binds exactly `PORT`. Anonymous signed Gallery sessions provide device-local Drive ownership; cross-device account recovery is not implemented yet.
+
+## Runtime repair checkpoint
+
+See [runtime repair evidence and remaining gaps](docs/RUNTIME-REPAIR.md) for the 2026-11-11
+source-action, imported-preview, offline-answer and filter-layout repairs. Browser regression
+checks are documented in `tests/browser/README.md` at the repository root. A new native build
+is required for document picker support; the web checks do not prove Android or AWS behavior.

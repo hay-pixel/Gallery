@@ -35,7 +35,12 @@ export function LocalSourceBrowser({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.scrim}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom + 12, 28) }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: Math.max(insets.bottom + 12, 28) },
+          ]}
+        >
           <View style={styles.handle} />
           <View style={styles.head}>
             <View>
@@ -49,11 +54,19 @@ export function LocalSourceBrowser({
             </Pressable>
           </View>
 
-          {accessState === "denied" ? (
+          {accessState === "unavailable" ? (
+            <View style={styles.bannerLimited}>
+              <Text style={styles.bannerLimitedText}>
+                Device media discovery is not connected in this build. Import a
+                canonical JSON collection using the picker below.
+              </Text>
+            </View>
+          ) : accessState === "denied" ? (
             <View style={styles.bannerDenied}>
               <MaterialIcons name="lock" size={18} color="#EF4444" />
               <Text style={styles.bannerDeniedText}>
-                Media access not granted. You can still select individual files via document picker.
+                Media access not granted. You can still select individual files
+                via document picker.
               </Text>
             </View>
           ) : accessState === "limited" ? (
@@ -67,7 +80,7 @@ export function LocalSourceBrowser({
 
           <Pressable onPress={onPickDocument} style={styles.pickBtn}>
             <MaterialIcons name="upload-file" size={18} color="#080D18" />
-            <Text style={styles.pickBtnText}>Pick Document or File</Text>
+            <Text style={styles.pickBtnText}>Pick canonical JSON</Text>
           </Pressable>
 
           <FlatList
@@ -76,7 +89,11 @@ export function LocalSourceBrowser({
             contentContainerStyle={styles.list}
             renderItem={({ item }) => (
               <View style={styles.itemRow}>
-                <MaterialIcons name="insert-drive-file" size={20} color="#50D4FF" />
+                <MaterialIcons
+                  name="insert-drive-file"
+                  size={20}
+                  color="#50D4FF"
+                />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName} numberOfLines={1}>
                     {item.displayName}
@@ -230,4 +247,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
